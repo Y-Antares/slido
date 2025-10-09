@@ -8,8 +8,9 @@
     <style>
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
-            background-color: #f0f2f5; /* 换成更柔和的背景色，类似Slido */
-            color: #333; 
+            /* 1. 背景改为Slido深蓝色 */
+            background-color: #1D224D;
+            color: #ffffff; /* 基础文字颜色改为白色 */
             margin: 0; 
             padding: 20px; 
             overflow: hidden; 
@@ -21,80 +22,179 @@
         .sidebar { 
             width: 250px; 
             padding: 20px; 
-            background-color: #fff; 
-            border-radius: 10px; 
+            /* 2. 侧边栏颜色调整以适应深色背景 */
+            background-color: #2C3053; 
+            border-radius: 12px; 
             text-align: center; 
-            flex-shrink: 0; /* 防止侧边栏被压缩 */
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
         }
-        .sidebar h2 { margin-top: 0; }
-        #qrcode { display: flex; justify-content: center; align-items: center; padding: 10px; background: white; border-radius: 5px; }
+        .sidebar h2 { 
+            margin-top: 0; 
+            color: #EFEFEF;
+        }
+        #qrcode-container {
+            margin-top: 20px;
+            padding: 10px; 
+            background: white; 
+            border-radius: 8px;
+        }
+        #qrcode-container p {
+            color: #333;
+            margin: 5px 0 10px;
+            font-weight: bold;
+        }
         
-        /* 1. 全新的卡片墙容器样式 */
         .card-wall {
             flex-grow: 1;
             margin-left: 20px;
             display: flex;
-            flex-wrap: wrap; /* 核心：允许卡片换行 */
-            align-content: flex-start; /* 让卡片从顶部开始排列 */
-            gap: 20px; /* 卡片之间的间距 */
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 20px;
             overflow-y: auto; /* 当卡片过多时，允许垂直滚动 */
+            padding: 5px; /* 防止滚动条紧贴卡片 */
         }
 
-        /* 2. 全新的问题卡片样式 */
+        /* 自定义滚动条样式 (可选，美化) */
+        .card-wall::-webkit-scrollbar {
+            width: 8px;
+        }
+        .card-wall::-webkit-scrollbar-track {
+            background: #2C3053;
+            border-radius: 4px;
+        }
+        .card-wall::-webkit-scrollbar-thumb {
+            background: #4A5073;
+            border-radius: 4px;
+        }
+        .card-wall::-webkit-scrollbar-thumb:hover {
+            background: #5E6591;
+        }
+
         .card {
             background-color: #fff;
+            color: #333; /* 卡片内文字颜色为深色 */
             border-radius: 8px;
             padding: 20px;
-            width: calc(33.333% - 27px); /* 每行3个卡片，并计算间距 */
-            min-width: 280px; /* 保证卡片在小屏幕上不会太窄 */
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            width: calc(33.333% - 27px);
+            min-width: 280px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
             display: flex;
-            flex-direction: column; /* 让内容垂直排列 */
-            justify-content: space-between; /* 将提问人和问题内容推向两端 */
-            animation: fadeIn 0.5s ease; /* 新卡片出现时的淡入动画 */
+            flex-direction: column;
+            justify-content: space-between;
+            animation: fadeIn 0.5s ease;
+            transition: transform 0.2s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px); /* 鼠标悬浮时轻微上移 */
         }
         .card .question-text {
             font-size: 20px;
-            word-wrap: break-word; /* 允许长单词换行 */
+            line-height: 1.4;
+            word-wrap: break-word;
         }
         .card .author-name {
             font-size: 14px;
+            font-weight: 500;
             color: #555;
-            text-align: right; /* 名字靠右显示 */
-            margin-top: 15px; /* 与问题内容拉开距离 */
+            text-align: right;
+            margin-top: 15px;
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 响应式布局：当屏幕宽度小于900px时，每行显示2个卡片 */
+        @media (max-width: 900px) {
+            .card {
+                width: calc(50% - 25px);
+            }
+        }
+        /* 响应式布局：当屏幕宽度小于600px时，每行显示1个卡片 */
+        @media (max-width: 600px) {
+            .container {
+                flex-direction: column;
+                height: auto;
+            }
+            .sidebar {
+                width: auto;
+                margin-bottom: 20px;
+            }
+            .card-wall {
+                margin-left: 0;
+            }
+            .card {
+                width: 100%;
+                min-width: unset;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="sidebar">
-            <h2>手机扫码提问</h2>
-            <div id="qrcode"></div>
+            <h2>加入互动</h2>
+            <div id="qrcode-container">
+                <p>手机扫码提问</p>
+                <div id="qrcode"></div>
+            </div>
         </div>
         <div id="card-wall" class="card-wall">
             </div>
     </div>
 
     <script>
-        // ... (二维码生成部分和 WebSocket 连接部分不变) ...
+        // --- 二维码生成 ---
+        const clientUrl = `${window.location.protocol}//${window.location.host}/client.html`;
+        try {
+            const qr = qrcode(4, 'L');
+            qr.addData(clientUrl);
+            qr.make();
+            document.getElementById('qrcode').innerHTML = qr.createImgTag(5, 5); // size, margin
+        } catch (e) {
+            console.error("二维码生成失败: ", e);
+            document.getElementById('qrcode').textContent = "二维码加载失败";
+        }
+        
+        // --- WebSocket 连接 ---
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
+        const wsUrl = `${wsProtocol}//${window.location.host}`;
+        let ws;
 
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === 'new_question') {
-                // 调用新的函数来创建卡片
-                createQuestionCard(data.payload);
-            }
-        };
+        function connectWebSocket() {
+            ws = new WebSocket(wsUrl);
 
-        // 3. 全新的创建卡片的函数
+            ws.onopen = () => {
+                console.log('成功连接到WebSocket服务器');
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'new_question') {
+                        createQuestionCard(data.payload);
+                    }
+                } catch (e) {
+                    console.error("解析消息失败: ", e);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log('与WebSocket服务器断开连接，尝试1秒后重连...');
+                setTimeout(connectWebSocket, 1000); // 断线重连
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket 发生错误: ', error);
+                ws.close();
+            };
+        }
+
+        // --- 创建问题卡片 ---
         function createQuestionCard(questionData) {
             const wall = document.getElementById('card-wall');
             
@@ -105,12 +205,12 @@
             // 创建显示问题的部分
             const questionText = document.createElement('div');
             questionText.className = 'question-text';
-            questionText.textContent = questionData.text; // 从 payload 获取问题文本
+            questionText.textContent = questionData.text;
 
             // 创建显示作者的部分
             const authorName = document.createElement('div');
             authorName.className = 'author-name';
-            authorName.textContent = `- ${questionData.name}`; // 从 payload 获取名字
+            authorName.textContent = `— ${questionData.name}`;
 
             // 把各部分组装起来
             card.appendChild(questionText);
@@ -119,6 +219,9 @@
             // 将新卡片添加到墙的最前面
             wall.prepend(card);
         }
+
+        // 启动 WebSocket 连接
+        connectWebSocket();
     </script>
 </body>
 </html>

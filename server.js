@@ -17,6 +17,7 @@ mongoose.connect(MONGO_URI)
 // 定义一个数据模型 (Schema)
 const questionSchema = new mongoose.Schema({
     text: String,
+    name: { type: String, default: '匿名' }, // 增加 name 字段，并设置默认值为'匿名'
     createdAt: { type: Date, default: Date.now }
 });
 const Question = mongoose.model('Question', questionSchema);
@@ -36,29 +37,41 @@ const wss = new WebSocket.Server({ server });
 wss.on('connection', ws => { /* ... */ });
 
 // 修改 /ask 接口以使用数据库
-app.post('/ask', async (req, res) => { // 注意这里改成了 async
-    const { question } = req.body;
+app.post('/ask', async (req, res) => {
+    // 从请求体中同时获取 question 和 name
+    const { question, name } = req.body; 
+
     if (question) {
         try {
-            // 1. 创建一个新的问题实例
-            const newQuestion = new Question({ text: question });
-            // 2. 保存到数据库
+            // 创建实例时同时保存 text 和 name
+            const newQuestion = new Question({
+                text: question,
+                // 如果用户没填名字，就使用'匿名'
+                name: name || '匿名' 
+            });
             await newQuestion.save();
-            console.log(`问题已成功保存到数据库: ${question}`);
+            console.log(`问题已保存: "${question}" by ${newQuestion.name}`);
 
-            // 3. 广播给前端 (不变)
+            // 广播给前端时，把整个问题对象（包含text和name）都发过去
             wss.clients.forEach(client => {
                 if (client.readyState === WebSocket.OPEN) {
-                    client.send(JSON.stringify({ type: 'new_question', payload: question }));
+                    client.send(JSON.stringify({
+                        type: 'new_question',
+                        // payload 现在是一个包含 text 和 name 的对象
+                        payload: { 
+                            text: newQuestion.text,
+                            name: newQuestion.name
+                        }
+                    }));
                 }
             });
-            res.status(200).json({ message: '问题已收到！' });
+            res.status(200).json({ message: '问题已收到' });
         } catch (err) {
             console.error('保存问题到数据库失败:', err);
             res.status(500).json({ message: '服务器内部错误' });
         }
     } else {
-        res.status(400).json({ message: '问题不能为空！' });
+        res.status(400).json({ message: '问题不能为空' });
     }
 });
 

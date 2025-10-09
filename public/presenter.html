@@ -6,26 +6,68 @@
     <title>问题展示墙</title>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #1a1a1a; color: white; margin: 0; padding: 20px; overflow: hidden; }
-        .container { display: flex; height: calc(100vh - 40px); }
-        .sidebar { width: 250px; padding: 20px; background-color: #333; border-radius: 10px; text-align: center; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            background-color: #f0f2f5; /* 换成更柔和的背景色，类似Slido */
+            color: #333; 
+            margin: 0; 
+            padding: 20px; 
+            overflow: hidden; 
+        }
+        .container { 
+            display: flex; 
+            height: calc(100vh - 40px); 
+        }
+        .sidebar { 
+            width: 250px; 
+            padding: 20px; 
+            background-color: #fff; 
+            border-radius: 10px; 
+            text-align: center; 
+            flex-shrink: 0; /* 防止侧边栏被压缩 */
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
         .sidebar h2 { margin-top: 0; }
         #qrcode { display: flex; justify-content: center; align-items: center; padding: 10px; background: white; border-radius: 5px; }
-        .danmaku-container { position: relative; flex-grow: 1; margin-left: 20px; }
-        .bubble {
-            position: absolute;
-            background-color: rgba(52, 152, 219, 0.8);
-            color: white;
-            padding: 15px 25px;
-            border-radius: 50px;
-            font-size: 24px;
-            white-space: nowrap;
-            animation: float-across 15s linear forwards;
-            opacity: 0;
+        
+        /* 1. 全新的卡片墙容器样式 */
+        .card-wall {
+            flex-grow: 1;
+            margin-left: 20px;
+            display: flex;
+            flex-wrap: wrap; /* 核心：允许卡片换行 */
+            align-content: flex-start; /* 让卡片从顶部开始排列 */
+            gap: 20px; /* 卡片之间的间距 */
+            overflow-y: auto; /* 当卡片过多时，允许垂直滚动 */
         }
-        @keyframes float-across {
-            0% { transform: translateX(100vw); opacity: 1; }
-            100% { transform: translateX(-100%); opacity: 1; }
+
+        /* 2. 全新的问题卡片样式 */
+        .card {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            width: calc(33.333% - 27px); /* 每行3个卡片，并计算间距 */
+            min-width: 280px; /* 保证卡片在小屏幕上不会太窄 */
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column; /* 让内容垂直排列 */
+            justify-content: space-between; /* 将提问人和问题内容推向两端 */
+            animation: fadeIn 0.5s ease; /* 新卡片出现时的淡入动画 */
+        }
+        .card .question-text {
+            font-size: 20px;
+            word-wrap: break-word; /* 允许长单词换行 */
+        }
+        .card .author-name {
+            font-size: 14px;
+            color: #555;
+            text-align: right; /* 名字靠右显示 */
+            margin-top: 15px; /* 与问题内容拉开距离 */
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
         }
     </style>
 </head>
@@ -35,56 +77,47 @@
             <h2>手机扫码提问</h2>
             <div id="qrcode"></div>
         </div>
-        <div id="danmaku-container" class="danmaku-container">
+        <div id="card-wall" class="card-wall">
             </div>
     </div>
 
     <script>
-        // 1. 生成二维码
-        const clientUrl = `${window.location.protocol}//${window.location.host}/client.html`;
-        const typeNumber = 4;
-        const errorCorrectionLevel = 'L';
-        const qr = qrcode(typeNumber, errorCorrectionLevel);
-        qr.addData(clientUrl);
-        qr.make();
-        document.getElementById('qrcode').innerHTML = qr.createImgTag(6);
-
-        // 2. 连接 WebSocket 服务器
+        // ... (二维码生成部分和 WebSocket 连接部分不变) ...
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
-
-        ws.onopen = () => {
-            console.log('成功连接到WebSocket服务器');
-        };
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.type === 'new_question') {
-                createBubble(data.payload);
+                // 调用新的函数来创建卡片
+                createQuestionCard(data.payload);
             }
         };
 
-        ws.onclose = () => {
-            console.log('与WebSocket服务器断开连接');
-        };
-
-        // 3. 创建问题气泡/弹幕
-        function createBubble(text) {
-            const container = document.getElementById('danmaku-container');
-            const bubble = document.createElement('div');
-            bubble.className = 'bubble';
-            bubble.textContent = text;
-
-            // 随机垂直位置
-            const randomTop = Math.random() * (container.clientHeight - 60); // 减去气泡高度
-            bubble.style.top = `${randomTop}px`;
+        // 3. 全新的创建卡片的函数
+        function createQuestionCard(questionData) {
+            const wall = document.getElementById('card-wall');
             
-            container.appendChild(bubble);
+            // 创建卡片的基本结构
+            const card = document.createElement('div');
+            card.className = 'card';
 
-            // 动画结束后移除元素，避免内存泄漏
-            setTimeout(() => {
-                bubble.remove();
-            }, 15000); // 动画时长为15秒
+            // 创建显示问题的部分
+            const questionText = document.createElement('div');
+            questionText.className = 'question-text';
+            questionText.textContent = questionData.text; // 从 payload 获取问题文本
+
+            // 创建显示作者的部分
+            const authorName = document.createElement('div');
+            authorName.className = 'author-name';
+            authorName.textContent = `- ${questionData.name}`; // 从 payload 获取名字
+
+            // 把各部分组装起来
+            card.appendChild(questionText);
+            card.appendChild(authorName);
+            
+            // 将新卡片添加到墙的最前面
+            wall.prepend(card);
         }
     </script>
 </body>

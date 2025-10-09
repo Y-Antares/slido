@@ -1,4 +1,4 @@
-# 实时问答互动平台
+# 实时问答互动平台：live-poll
 
 ## 项目构想 (Project Concept)
 

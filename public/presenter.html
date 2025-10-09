@@ -10,8 +10,27 @@
         .container { display: flex; height: calc(100vh - 40px); }
         .sidebar { width: 250px; padding: 20px; background-color: #2C3053; border-radius: 12px; text-align: center; flex-shrink: 0; display: flex; flex-direction: column; }
         .sidebar h2 { margin-top: 0; color: #EFEFEF; }
-        #qrcode-container { margin-top: 20px; padding: 10px; background: white; border-radius: 8px; }
+        #qrcode-container { margin-top: 20px; padding: 15px; background: white; border-radius: 8px; }
         #qrcode-container p { color: #333; margin: 5px 0 10px; font-weight: bold; }
+        
+        /* 新增：复制按钮样式 */
+        #copy-qr-btn {
+            width: 100%;
+            margin-top: 10px;
+            padding: 8px 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            border: none;
+            border-radius: 6px;
+            background-color: #4A5073;
+            color: #EFEFEF;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        #copy-qr-btn:hover {
+            background-color: #5E6591;
+        }
+        
         .live-counter { margin-top: auto; padding-top: 20px; border-top: 1px solid #4A5073; color: #EFEFEF; }
         .live-counter-number { font-size: 2.5rem; font-weight: bold; color: #38C695; }
         .live-counter-label { font-size: 1rem; color: #aaa; }
@@ -20,47 +39,14 @@
         .card-wall::-webkit-scrollbar-track { background: #2C3053; border-radius: 4px; }
         .card-wall::-webkit-scrollbar-thumb { background: #4A5073; border-radius: 4px; }
         .card-wall::-webkit-scrollbar-thumb:hover { background: #5E6591; }
-        
-        .card {
-            position: relative; /* 为了定位删除按钮 */
-            background-color: #fff; color: #333; border-radius: 8px; padding: 20px; width: calc(33.333% - 27px); min-width: 280px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; animation: fadeIn 0.5s ease; transition: transform 0.2s ease;
-        }
+        .card { position: relative; background-color: #fff; color: #333; border-radius: 8px; padding: 20px; width: calc(33.333% - 27px); min-width: 280px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; animation: fadeIn 0.5s ease; transition: transform 0.2s ease; }
         .card:hover { transform: translateY(-5px); }
         .card .question-text { font-size: 20px; line-height: 1.4; word-wrap: break-word; }
         .card .author-name { font-size: 14px; font-weight: 500; color: #555; text-align: right; margin-top: 15px; }
-
-        /* 新增：删除按钮样式 */
-        .delete-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            border: none;
-            background-color: #e0e0e0;
-            color: #555;
-            font-size: 16px;
-            line-height: 24px;
-            text-align: center;
-            cursor: pointer;
-            opacity: 0; /* 默认隐藏 */
-            transition: opacity 0.2s ease, background-color 0.2s ease;
-        }
-        .card:hover .delete-btn {
-            opacity: 1; /* 鼠标悬浮在卡片上时显示按钮 */
-        }
-        .delete-btn:hover {
-            background-color: #f44336; /* 悬浮时变红 */
-            color: white;
-        }
-        /* 新增：卡片删除时的动画 */
-        .card.deleting {
-            transition: opacity 0.4s ease, transform 0.4s ease;
-            opacity: 0;
-            transform: scale(0.95);
-        }
-        
+        .delete-btn { position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; border-radius: 50%; border: none; background-color: #e0e0e0; color: #555; font-size: 16px; line-height: 24px; text-align: center; cursor: pointer; opacity: 0; transition: opacity 0.2s ease, background-color 0.2s ease; }
+        .card:hover .delete-btn { opacity: 1; }
+        .delete-btn:hover { background-color: #f44336; color: white; }
+        .card.deleting { transition: opacity 0.4s ease, transform 0.4s ease; opacity: 0; transform: scale(0.95); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @media (max-width: 900px) { .card { width: calc(50% - 25px); } }
         @media (max-width: 600px) { .container { flex-direction: column; height: auto; } .sidebar { width: auto; margin-bottom: 20px; } .card-wall { margin-left: 0; } .card { width: 100%; min-width: unset; } }
@@ -73,6 +59,7 @@
             <div id="qrcode-container">
                 <p>手机扫码提问</p>
                 <div id="qrcode"></div>
+                <button id="copy-qr-btn">复制二维码</button>
             </div>
             <div class="live-counter">
                 <div id="client-count" class="live-counter-number">0</div>
@@ -81,23 +68,67 @@
         </div>
         <div id="card-wall" class="card-wall"></div>
     </div>
+
     <script>
+        // --- 变量定义 ---
         const pathParts = window.location.pathname.split('/');
         const sessionCode = pathParts[pathParts.length - 1];
+
+        // --- 二维码生成 ---
         const clientUrl = `${window.location.protocol}//${window.location.host}/session/${sessionCode}/ask`;
         try {
             const qr = qrcode(4, 'L');
             qr.addData(clientUrl);
             qr.make();
             document.getElementById('qrcode').innerHTML = qr.createImgTag(5, 5);
-        } catch (e) {
-            console.error("二维码生成失败: ", e);
-            document.getElementById('qrcode').textContent = "二维码加载失败";
-        }
+        } catch (e) { /* ... */ }
+        
+        // --- 新增：复制二维码逻辑 ---
+        const copyBtn = document.getElementById('copy-qr-btn');
+        copyBtn.addEventListener('click', async () => {
+            // 检查浏览器是否支持Clipboard API
+            if (!navigator.clipboard || !navigator.clipboard.write) {
+                alert('您的浏览器不支持此功能，请尝试手动右键复制。');
+                return;
+            }
+
+            try {
+                const qrImg = document.querySelector('#qrcode img');
+                if (!qrImg) {
+                    alert('二维码图片不存在。');
+                    return;
+                }
+
+                // qrcode.js 生成的是一个 base64 data URL，我们需要先把它转成 Blob 对象
+                const dataUrl = qrImg.src;
+                const response = await fetch(dataUrl);
+                const blob = await response.blob();
+
+                // 使用 Clipboard API 将 Blob 写入剪贴板
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        [blob.type]: blob
+                    })
+                ]);
+
+                // 提供用户反馈
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✅ 已复制！';
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                }, 2000);
+
+            } catch (err) {
+                console.error('复制失败: ', err);
+                alert('复制二维码失败，可能是浏览器权限问题。');
+            }
+        });
+
+        // --- WebSocket 连接 ---
+        // ... (这部分代码保持不变) ...
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${wsProtocol}//${window.location.host}`;
         let ws;
-
         function connectWebSocket() {
             ws = new WebSocket(wsUrl);
             ws.onopen = () => {

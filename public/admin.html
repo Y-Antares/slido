@@ -49,7 +49,6 @@
                 return;
             }
 
-            // 将本地时间转换为API需要的ISO字符串 (UTC时间)
             const startISO = new Date(startTime).toISOString();
             const endISO = new Date(endTime).toISOString();
             
@@ -66,16 +65,16 @@
         });
 
         function renderTable(questions) {
-            tableBody.innerHTML = ''; // 清空表格
+            tableBody.innerHTML = '';
             if (questions.length === 0) {
                 exportBtn.style.display = 'none';
+                tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center;">该时间段内没有问题。</td></tr>';
                 return;
             }
 
             questions.forEach(q => {
                 const row = tableBody.insertRow();
-                // 将UTC时间转换回本地时间并格式化
-                const localTime = new Date(q.createdAt).toLocaleString();
+                const localTime = new Date(q.createdAt).toLocaleString('zh-CN', { hour12: false });
                 row.insertCell(0).textContent = localTime;
                 row.insertCell(1).textContent = q.name;
                 row.insertCell(2).textContent = q.text;
@@ -86,18 +85,22 @@
         exportBtn.addEventListener('click', () => {
             if (currentQuestions.length === 0) return;
             
-            let csvContent = "data:text/csv;charset=utf-8,时间,提问人,问题内容\n";
+            // 在CSV内容的开头加入BOM标记 \uFEFF 来兼容Excel
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF时间,提问人,问题内容\n";
+            
             currentQuestions.forEach(q => {
-                const time = `"${new Date(q.createdAt).toLocaleString()}"`;
+                // 将时间格式化为更适合CSV的格式，并确保数据安全
+                const time = `"${new Date(q.createdAt).toLocaleString('zh-CN', { hour12: false })}"`;
                 const name = `"${q.name}"`;
                 const text = `"${q.text.replace(/"/g, '""')}"`; // 处理问题中的双引号
+                
                 csvContent += [time, name, text].join(',') + "\n";
             });
 
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "questions.csv");
+            link.setAttribute("download", "questions_export.csv"); // 给文件一个更具体的名字
             document.body.appendChild(link);
             link.click();
             link.remove();

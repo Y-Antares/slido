@@ -2,19 +2,191 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>我的仪表盘</title>
-    <style>/* ... (可以添加一些美化样式) ... */</style>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #1D224D;
+            color: #EFEFEF;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        h1, h2 {
+            font-weight: 500;
+            border-bottom: 1px solid #2C3053;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 40px;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+        }
+
+        .card {
+            background-color: #2C3053;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .create-session-form {
+            display: flex;
+            gap: 15px;
+        }
+
+        #session-name {
+            flex-grow: 1;
+            padding: 12px 15px;
+            font-size: 1rem;
+            border: 1px solid #4A5073;
+            border-radius: 8px;
+            background-color: #1D224D;
+            color: #EFEFEF;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        #session-name:focus {
+            border-color: #4D96FF;
+        }
+
+        #create-btn {
+            padding: 12px 25px;
+            font-size: 1rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            background-color: #4D96FF;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+        }
+
+        #create-btn:hover {
+            background-color: #63a4ff;
+        }
+        
+        #create-btn:active {
+            transform: scale(0.98);
+        }
+        
+        #create-btn:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+
+        #sessions-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .session-card {
+            background-color: #2C3053;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .session-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+
+        .session-card h3 {
+            margin: 0;
+            font-size: 1.4rem;
+            font-weight: 500;
+            word-break: break-all;
+        }
+
+        .session-card .code {
+            font-family: monospace;
+            background-color: #1D224D;
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+
+        .session-card .date {
+            font-size: 0.9rem;
+            color: #999;
+        }
+
+        .session-card .links {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .session-card .links a {
+            text-decoration: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background-color 0.2s ease, color 0.2s ease;
+        }
+        
+        .session-card .links .presenter-link {
+            background-color: #38C695;
+            color: white;
+        }
+        .session-card .links .presenter-link:hover {
+            background-color: #45e0a9;
+        }
+
+        .session-card .links .ask-link {
+            background-color: #4A5073;
+            color: #EFEFEF;
+        }
+        .session-card .links .ask-link:hover {
+            background-color: #5E6591;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+
+    </style>
 </head>
 <body>
-    <h1>我的活动场次</h1>
-    <div>
-        <h2>创建新场次</h2>
-        <input type="text" id="session-name" placeholder="输入课程或活动名称">
-        <button id="create-btn">创建</button>
+    <div class="container">
+        <h1>我的仪表盘</h1>
+
+        <div class="card">
+            <h2>创建新场次</h2>
+            <div class="create-session-form">
+                <input type="text" id="session-name" placeholder="输入课程或活动名称">
+                <button id="create-btn">创建</button>
+            </div>
+        </div>
+
+        <div class="sessions-container">
+            <h2>历史场次</h2>
+            <div id="sessions-list">
+                </div>
+        </div>
     </div>
-    <hr>
-    <h2>历史场次</h2>
-    <div id="sessions-list"></div>
 
     <script>
         const createBtn = document.getElementById('create-btn');
@@ -22,35 +194,88 @@
         const sessionsListDiv = document.getElementById('sessions-list');
 
         async function fetchSessions() {
-            const response = await fetch('/api/sessions');
-            const sessions = await response.json();
-            sessionsListDiv.innerHTML = '';
-            sessions.forEach(s => {
-                const div = document.createElement('div');
-                div.innerHTML = `
-                    <h3>${s.name} (代码: ${s.code})</h3>
-                    <p>创建于: ${new Date(s.createdAt).toLocaleString()}</p>
-                    <p>
-                        <a href="/session/${s.code}" target="_blank">打开展示页</a> | 
-                        <a href="/session/${s.code}/ask" target="_blank">打开提问页 (用于生成二维码)</a>
-                    </p>
-                `;
-                sessionsListDiv.appendChild(div);
-            });
+            try {
+                const response = await fetch('/api/sessions');
+                if (!response.ok) throw new Error('Failed to fetch sessions');
+                const sessions = await response.json();
+
+                sessionsListDiv.innerHTML = ''; // Clear previous list
+
+                if (sessions.length === 0) {
+                    sessionsListDiv.innerHTML = `<p class="empty-state">还没有任何场次，快在上方创建一个吧！</p>`;
+                    return;
+                }
+
+                sessions.forEach(s => {
+                    const card = document.createElement('div');
+                    card.className = 'session-card';
+                    
+                    // 使用日本时区和 uygun 格式显示时间
+                    const formattedDate = new Date(s.createdAt).toLocaleString('ja-JP', {
+                        year: 'numeric', month: '2-digit', day: '2-digit',
+                        hour: '2-digit', minute: '2-digit', hour12: false
+                    });
+
+                    card.innerHTML = `
+                        <h3>${escapeHTML(s.name)}</h3>
+                        <p class="date">创建于: ${formattedDate}</p>
+                        <p>唯一代码: <span class="code">${s.code}</span></p>
+                        <div class="links">
+                            <a href="/session/${s.code}" target="_blank" class="presenter-link">打开展示页</a>
+                            <a href="/session/${s.code}/ask" target="_blank" class="ask-link">打开提问页</a>
+                        </div>
+                    `;
+                    sessionsListDiv.appendChild(card);
+                });
+            } catch (error) {
+                console.error("Error fetching sessions:", error);
+                sessionsListDiv.innerHTML = `<p class="empty-state" style="color: #ff6b6b;">加载历史场次失败。</p>`;
+            }
         }
 
         createBtn.addEventListener('click', async () => {
             const name = sessionNameInput.value.trim();
-            if (!name) return alert('名称不能为空');
-            await fetch('/api/sessions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name })
-            });
-            sessionNameInput.value = '';
-            fetchSessions();
-        });
+            if (!name) {
+                alert('场次名称不能为空！');
+                return;
+            }
 
+            createBtn.disabled = true;
+            createBtn.textContent = "创建中...";
+
+            try {
+                const response = await fetch('/api/sessions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+
+                if (!response.ok) throw new Error('Creation failed');
+                
+                sessionNameInput.value = '';
+                await fetchSessions(); // Refresh the list
+            } catch (error) {
+                console.error("Error creating session:", error);
+                alert('创建失败，请重试。');
+            } finally {
+                createBtn.disabled = false;
+                createBtn.textContent = "创建";
+            }
+        });
+        
+        function escapeHTML(str) {
+            return str.replace(/[&<>"']/g, function(match) {
+                return {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#39;'
+                }[match];
+            });
+        }
+
+        // Initial load
         fetchSessions();
     </script>
 </body>

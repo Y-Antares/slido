@@ -6,73 +6,22 @@
     <title>问题展示墙</title>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
     <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
-            background-color: #1D224D;
-            color: #ffffff; 
-            margin: 0; 
-            padding: 20px; 
-            overflow: hidden; 
-        }
-        .container { 
-            display: flex; 
-            height: calc(100vh - 40px); 
-        }
-        .sidebar { 
-            width: 250px; 
-            padding: 20px; 
-            background-color: #2C3053; 
-            border-radius: 12px; 
-            text-align: center; 
-            flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-        }
-        .sidebar h2 { 
-            margin-top: 0; 
-            color: #EFEFEF;
-        }
-        #qrcode-container {
-            margin-top: 20px;
-            padding: 10px; 
-            background: white; 
-            border-radius: 8px;
-        }
-        #qrcode-container p {
-            color: #333;
-            margin: 5px 0 10px;
-            font-weight: bold;
-        }
-        
-        .card-wall {
-            flex-grow: 1;
-            margin-left: 20px;
-            display: flex;
-            flex-wrap: wrap;
-            align-content: flex-start;
-            gap: 20px;
-            overflow-y: auto;
-            padding: 5px;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #1D224D; color: #ffffff; margin: 0; padding: 20px; overflow: hidden; }
+        .container { display: flex; height: calc(100vh - 40px); }
+        .sidebar { width: 250px; padding: 20px; background-color: #2C3053; border-radius: 12px; text-align: center; flex-shrink: 0; display: flex; flex-direction: column; }
+        .sidebar h2 { margin-top: 0; color: #EFEFEF; }
+        #qrcode-container { margin-top: 20px; padding: 10px; background: white; border-radius: 8px; }
+        #qrcode-container p { color: #333; margin: 5px 0 10px; font-weight: bold; }
+        /* 新增：实时人数计数器样式 */
+        .live-counter { margin-top: auto; padding-top: 20px; border-top: 1px solid #4A5073; color: #EFEFEF; }
+        .live-counter-number { font-size: 2.5rem; font-weight: bold; color: #38C695; }
+        .live-counter-label { font-size: 1rem; color: #aaa; }
+        .card-wall { flex-grow: 1; margin-left: 20px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 20px; overflow-y: auto; padding: 5px; }
         .card-wall::-webkit-scrollbar { width: 8px; }
         .card-wall::-webkit-scrollbar-track { background: #2C3053; border-radius: 4px; }
         .card-wall::-webkit-scrollbar-thumb { background: #4A5073; border-radius: 4px; }
         .card-wall::-webkit-scrollbar-thumb:hover { background: #5E6591; }
-
-        .card {
-            background-color: #fff;
-            color: #333;
-            border-radius: 8px;
-            padding: 20px;
-            width: calc(33.333% - 27px);
-            min-width: 280px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            animation: fadeIn 0.5s ease;
-            transition: transform 0.2s ease;
-        }
+        .card { background-color: #fff; color: #333; border-radius: 8px; padding: 20px; width: calc(33.333% - 27px); min-width: 280px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; animation: fadeIn 0.5s ease; transition: transform 0.2s ease; }
         .card:hover { transform: translateY(-5px); }
         .card .question-text { font-size: 20px; line-height: 1.4; word-wrap: break-word; }
         .card .author-name { font-size: 14px; font-weight: 500; color: #555; text-align: right; margin-top: 15px; }
@@ -89,17 +38,16 @@
                 <p>手机扫码提问</p>
                 <div id="qrcode"></div>
             </div>
-        </div>
-        <div id="card-wall" class="card-wall">
+            <div class="live-counter">
+                <div id="client-count" class="live-counter-number">0</div>
+                <div class="live-counter-label">当前在线</div>
             </div>
+        </div>
+        <div id="card-wall" class="card-wall"></div>
     </div>
-
     <script>
-        // 1. 从URL中获取场次代码, 例如 /session/ABCDE -> ABCDE
         const pathParts = window.location.pathname.split('/');
         const sessionCode = pathParts[pathParts.length - 1];
-
-        // 2. 生成指向本场次提问页的二维码
         const clientUrl = `${window.location.protocol}//${window.location.host}/session/${sessionCode}/ask`;
         try {
             const qr = qrcode(4, 'L');
@@ -110,42 +58,36 @@
             console.error("二维码生成失败: ", e);
             document.getElementById('qrcode').textContent = "二维码加载失败";
         }
-        
-        // 3. WebSocket 连接并加入指定房间
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${wsProtocol}//${window.location.host}`;
         let ws;
-
         function connectWebSocket() {
             ws = new WebSocket(wsUrl);
-
             ws.onopen = () => {
                 console.log('成功连接到WebSocket服务器');
-                // 连接成功后，立即发送 'join' 消息，告诉服务器要加入哪个房间
                 ws.send(JSON.stringify({ type: 'join', room: sessionCode }));
             };
-
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
+                    // 根据消息类型做不同处理
                     if (data.type === 'new_question') {
                         createQuestionCard(data.payload);
+                    } else if (data.type === 'client_count_update') {
+                        // 新增：更新实时在线人数的逻辑
+                        document.getElementById('client-count').textContent = data.count;
                     }
                 } catch (e) { console.error("解析消息失败: ", e); }
             };
-
             ws.onclose = () => {
                 console.log('WebSocket连接断开，1秒后重连...');
                 setTimeout(connectWebSocket, 1000);
             };
-
             ws.onerror = (error) => {
                 console.error('WebSocket 发生错误: ', error);
                 ws.close();
             };
         }
-
-        // 4. 创建问题卡片的函数 (不变)
         function createQuestionCard(questionData) {
             const wall = document.getElementById('card-wall');
             const card = document.createElement('div');
@@ -160,30 +102,21 @@
             card.appendChild(authorName);
             wall.prepend(card);
         }
-
-        // 5. 页面加载时，获取本场次的历史信息和问题
         async function loadInitialData() {
             try {
                 const response = await fetch(`/api/sessions/${sessionCode}`);
                 if (!response.ok) throw new Error('场次不存在或加载失败');
                 const data = await response.json();
-                
-                // 设置页面标题和侧边栏标题
                 const sessionName = data.session.name;
                 document.title = `${sessionName} - 问题墙`;
                 document.getElementById('session-title').textContent = sessionName;
-
-                // 清空旧内容并渲染历史问题
                 document.getElementById('card-wall').innerHTML = '';
                 data.questions.forEach(createQuestionCard);
-
             } catch(e) {
                 console.error(e);
                 document.body.innerHTML = `<h1>错误：无法加载场次 ${sessionCode}</h1>`;
             }
         }
-
-        // 启动所有功能
         loadInitialData();
         connectWebSocket();
     </script>

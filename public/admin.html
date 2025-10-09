@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>问题管理后台</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .controls { margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        button { font-size: 16px; padding: 5px 10px; }
+    </style>
+</head>
+<body>
+    <h1>问题管理后台</h1>
+    <div class="controls">
+        <label for="start-time">开始时间:</label>
+        <input type="datetime-local" id="start-time">
+        <label for="end-time">结束时间:</label>
+        <input type="datetime-local" id="end-time">
+        <button id="fetch-btn">获取问题</button>
+        <button id="export-btn" style="display:none;">导出为CSV</button>
+    </div>
+    <table id="questions-table">
+        <thead>
+            <tr>
+                <th>时间</th>
+                <th>提问人</th>
+                <th>问题内容</th>
+            </tr>
+        </thead>
+        <tbody>
+            </tbody>
+    </table>
+
+    <script>
+        const fetchBtn = document.getElementById('fetch-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const tableBody = document.querySelector('#questions-table tbody');
+        let currentQuestions = []; // 用于存储当前获取到的问题
+
+        fetchBtn.addEventListener('click', async () => {
+            const startTime = document.getElementById('start-time').value;
+            const endTime = document.getElementById('end-time').value;
+
+            if (!startTime || !endTime) {
+                alert('请选择开始和结束时间');
+                return;
+            }
+
+            // 将本地时间转换为API需要的ISO字符串 (UTC时间)
+            const startISO = new Date(startTime).toISOString();
+            const endISO = new Date(endTime).toISOString();
+            
+            try {
+                const response = await fetch(`/api/questions?start=${startISO}&end=${endISO}`);
+                if (!response.ok) throw new Error('网络响应错误');
+                
+                currentQuestions = await response.json();
+                renderTable(currentQuestions);
+            } catch (error) {
+                console.error('获取失败:', error);
+                alert('获取问题失败');
+            }
+        });
+
+        function renderTable(questions) {
+            tableBody.innerHTML = ''; // 清空表格
+            if (questions.length === 0) {
+                exportBtn.style.display = 'none';
+                return;
+            }
+
+            questions.forEach(q => {
+                const row = tableBody.insertRow();
+                // 将UTC时间转换回本地时间并格式化
+                const localTime = new Date(q.createdAt).toLocaleString();
+                row.insertCell(0).textContent = localTime;
+                row.insertCell(1).textContent = q.name;
+                row.insertCell(2).textContent = q.text;
+            });
+            exportBtn.style.display = 'inline-block';
+        }
+
+        exportBtn.addEventListener('click', () => {
+            if (currentQuestions.length === 0) return;
+            
+            let csvContent = "data:text/csv;charset=utf-8,时间,提问人,问题内容\n";
+            currentQuestions.forEach(q => {
+                const time = `"${new Date(q.createdAt).toLocaleString()}"`;
+                const name = `"${q.name}"`;
+                const text = `"${q.text.replace(/"/g, '""')}"`; // 处理问题中的双引号
+                csvContent += [time, name, text].join(',') + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "questions.csv");
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        });
+    </script>
+</body>
+</html>

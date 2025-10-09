@@ -26,6 +26,9 @@ const Question = mongoose.model('Question', questionSchema);
 const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => {
+    res.redirect('/presenter.html');
+});
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });

@@ -13,23 +13,27 @@
         #qrcode-container { margin-top: 20px; padding: 15px; background: white; border-radius: 8px; }
         #qrcode-container p { color: #333; margin: 5px 0 10px; font-weight: bold; }
         
-        /* 新增：复制按钮样式 */
-        #copy-qr-btn {
-            width: 100%;
+        /* 修改二维码容器内的布局，以容纳多个按钮 */
+        #qrcode-actions {
+            display: flex;
+            gap: 10px; /* 按钮之间的间距 */
             margin-top: 10px;
+        }
+        #qrcode-actions button {
+            width: 100%;
             padding: 8px 10px;
             font-size: 0.9rem;
             font-weight: 500;
             border: none;
             border-radius: 6px;
-            background-color: #4A5073;
             color: #EFEFEF;
             cursor: pointer;
             transition: background-color 0.2s ease;
         }
-        #copy-qr-btn:hover {
-            background-color: #5E6591;
-        }
+        #copy-qr-btn { background-color: #4A5073; }
+        #copy-qr-btn:hover { background-color: #5E6591; }
+        #download-qr-btn { background-color: #38C695; } /* 下载按钮用绿色 */
+        #download-qr-btn:hover { background-color: #45e0a9; }
         
         .live-counter { margin-top: auto; padding-top: 20px; border-top: 1px solid #4A5073; color: #EFEFEF; }
         .live-counter-number { font-size: 2.5rem; font-weight: bold; color: #38C695; }
@@ -59,7 +63,10 @@
             <div id="qrcode-container">
                 <p>手机扫码提问</p>
                 <div id="qrcode"></div>
-                <button id="copy-qr-btn">复制二维码</button>
+                <div id="qrcode-actions">
+                    <button id="copy-qr-btn">复制图片</button>
+                    <button id="download-qr-btn">下载图片</button>
+                </div>
             </div>
             <div class="live-counter">
                 <div id="client-count" class="live-counter-number">0</div>
@@ -81,51 +88,48 @@
             qr.addData(clientUrl);
             qr.make();
             document.getElementById('qrcode').innerHTML = qr.createImgTag(5, 5);
-        } catch (e) { /* ... */ }
+        } catch (e) {
+            console.error("二维码生成失败: ", e);
+            document.getElementById('qrcode').textContent = "二维码加载失败";
+        }
         
-        // --- 新增：复制二维码逻辑 ---
+        const qrImgElement = document.querySelector('#qrcode img');
+
+        // --- 复制二维码逻辑 ---
         const copyBtn = document.getElementById('copy-qr-btn');
         copyBtn.addEventListener('click', async () => {
-            // 检查浏览器是否支持Clipboard API
             if (!navigator.clipboard || !navigator.clipboard.write) {
-                alert('您的浏览器不支持此功能，请尝试手动右键复制。');
+                alert('您的浏览器不支持自动复制图片，请尝试下载或手动右键复制。');
                 return;
             }
-
+            if (!qrImgElement) { alert('二维码图片不存在。'); return; }
             try {
-                const qrImg = document.querySelector('#qrcode img');
-                if (!qrImg) {
-                    alert('二维码图片不存在。');
-                    return;
-                }
-
-                // qrcode.js 生成的是一个 base64 data URL，我们需要先把它转成 Blob 对象
-                const dataUrl = qrImg.src;
+                const dataUrl = qrImgElement.src;
                 const response = await fetch(dataUrl);
                 const blob = await response.blob();
-
-                // 使用 Clipboard API 将 Blob 写入剪贴板
-                await navigator.clipboard.write([
-                    new ClipboardItem({
-                        [blob.type]: blob
-                    })
-                ]);
-
-                // 提供用户反馈
+                await navigator.clipboard.write([ new ClipboardItem({ [blob.type]: blob }) ]);
                 const originalText = copyBtn.textContent;
                 copyBtn.textContent = '✅ 已复制！';
-                setTimeout(() => {
-                    copyBtn.textContent = originalText;
-                }, 2000);
-
+                setTimeout(() => { copyBtn.textContent = originalText; }, 2000);
             } catch (err) {
                 console.error('复制失败: ', err);
                 alert('复制二维码失败，可能是浏览器权限问题。');
             }
         });
 
+        // --- 下载二维码逻辑 ---
+        const downloadBtn = document.getElementById('download-qr-btn');
+        downloadBtn.addEventListener('click', () => {
+            if (!qrImgElement) { alert('二维码图片不存在。'); return; }
+            const link = document.createElement('a');
+            link.href = qrImgElement.src;
+            link.download = `qrcode-session-${sessionCode}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
         // --- WebSocket 连接 ---
-        // ... (这部分代码保持不变) ...
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${wsProtocol}//${window.location.host}`;
         let ws;
@@ -143,12 +147,9 @@
                     } else if (data.type === 'client_count_update') {
                         document.getElementById('client-count').textContent = data.count;
                     } else if (data.type === 'question_deleted') {
-                        // 新增：处理问题被删除的消息
                         const questionId = data.payload.questionId;
                         const cardToRemove = document.querySelector(`.card[data-question-id="${questionId}"]`);
-                        if (cardToRemove) {
-                            removeCard(cardToRemove);
-                        }
+                        if (cardToRemove) { removeCard(cardToRemove); }
                     }
                 } catch (e) { console.error("解析消息失败: ", e); }
             };
@@ -162,58 +163,45 @@
             };
         }
 
+        // --- 创建/删除卡片函数 ---
         function createQuestionCard(questionData) {
             const wall = document.getElementById('card-wall');
             const card = document.createElement('div');
             card.className = 'card';
-            // 1. 在卡片上存储问题的唯一ID
             card.dataset.questionId = questionData._id;
-
             const questionText = document.createElement('div');
             questionText.className = 'question-text';
             questionText.textContent = questionData.text;
-
             const authorName = document.createElement('div');
             authorName.className = 'author-name';
             authorName.textContent = `— ${questionData.name}`;
-
-            // 2. 创建删除按钮
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-btn';
-            deleteBtn.innerHTML = '&times;'; // '×' 符号
+            deleteBtn.innerHTML = '&times;';
             deleteBtn.title = '删除问题';
-            
-            // 3. 为删除按钮添加点击事件
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation(); 
                 const questionId = e.target.closest('.card').dataset.questionId;
-                
                 if (confirm('您确定要从展示页移除这个问题吗？')) {
-                    fetch(`/api/questions/${questionId}`, {
-                        method: 'DELETE'
-                    }).catch(error => {
+                    fetch(`/api/questions/${questionId}`, { method: 'DELETE' })
+                    .catch(error => {
                         console.error('删除请求失败:', error);
                         alert('删除失败，请检查网络。');
                     });
                 }
             });
-
             card.appendChild(deleteBtn);
             card.appendChild(questionText);
             card.appendChild(authorName);
-            
             wall.prepend(card);
         }
 
-        // 新增：移除卡片的函数（带动画）
         function removeCard(cardElement) {
             cardElement.classList.add('deleting');
-            // 等待动画结束后再从DOM中移除
-            setTimeout(() => {
-                cardElement.remove();
-            }, 400); // 动画时长为0.4秒
+            setTimeout(() => { cardElement.remove(); }, 400);
         }
 
+        // --- 加载初始数据 ---
         async function loadInitialData() {
             try {
                 const response = await fetch(`/api/sessions/${sessionCode}`);
@@ -223,7 +211,6 @@
                 document.title = `${sessionName} - 问题墙`;
                 document.getElementById('session-title').textContent = sessionName;
                 document.getElementById('card-wall').innerHTML = '';
-                // 确保从后端获取的历史问题也包含 _id
                 data.questions.forEach(createQuestionCard);
             } catch(e) {
                 console.error(e);
@@ -231,6 +218,7 @@
             }
         }
 
+        // --- 启动所有功能 ---
         loadInitialData();
         connectWebSocket();
     </script>

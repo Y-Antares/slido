@@ -12,7 +12,6 @@
         .sidebar h2 { margin-top: 0; color: #EFEFEF; }
         #qrcode-container { margin-top: 20px; padding: 10px; background: white; border-radius: 8px; }
         #qrcode-container p { color: #333; margin: 5px 0 10px; font-weight: bold; }
-        /* 新增：实时人数计数器样式 */
         .live-counter { margin-top: auto; padding-top: 20px; border-top: 1px solid #4A5073; color: #EFEFEF; }
         .live-counter-number { font-size: 2.5rem; font-weight: bold; color: #38C695; }
         .live-counter-label { font-size: 1rem; color: #aaa; }
@@ -21,10 +20,47 @@
         .card-wall::-webkit-scrollbar-track { background: #2C3053; border-radius: 4px; }
         .card-wall::-webkit-scrollbar-thumb { background: #4A5073; border-radius: 4px; }
         .card-wall::-webkit-scrollbar-thumb:hover { background: #5E6591; }
-        .card { background-color: #fff; color: #333; border-radius: 8px; padding: 20px; width: calc(33.333% - 27px); min-width: 280px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; animation: fadeIn 0.5s ease; transition: transform 0.2s ease; }
+        
+        .card {
+            position: relative; /* 为了定位删除按钮 */
+            background-color: #fff; color: #333; border-radius: 8px; padding: 20px; width: calc(33.333% - 27px); min-width: 280px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; animation: fadeIn 0.5s ease; transition: transform 0.2s ease;
+        }
         .card:hover { transform: translateY(-5px); }
         .card .question-text { font-size: 20px; line-height: 1.4; word-wrap: break-word; }
         .card .author-name { font-size: 14px; font-weight: 500; color: #555; text-align: right; margin-top: 15px; }
+
+        /* 新增：删除按钮样式 */
+        .delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: none;
+            background-color: #e0e0e0;
+            color: #555;
+            font-size: 16px;
+            line-height: 24px;
+            text-align: center;
+            cursor: pointer;
+            opacity: 0; /* 默认隐藏 */
+            transition: opacity 0.2s ease, background-color 0.2s ease;
+        }
+        .card:hover .delete-btn {
+            opacity: 1; /* 鼠标悬浮在卡片上时显示按钮 */
+        }
+        .delete-btn:hover {
+            background-color: #f44336; /* 悬浮时变红 */
+            color: white;
+        }
+        /* 新增：卡片删除时的动画 */
+        .card.deleting {
+            transition: opacity 0.4s ease, transform 0.4s ease;
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @media (max-width: 900px) { .card { width: calc(50% - 25px); } }
         @media (max-width: 600px) { .container { flex-direction: column; height: auto; } .sidebar { width: auto; margin-bottom: 20px; } .card-wall { margin-left: 0; } .card { width: 100%; min-width: unset; } }
@@ -61,6 +97,7 @@
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${wsProtocol}//${window.location.host}`;
         let ws;
+
         function connectWebSocket() {
             ws = new WebSocket(wsUrl);
             ws.onopen = () => {
@@ -70,12 +107,17 @@
             ws.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    // 根据消息类型做不同处理
                     if (data.type === 'new_question') {
                         createQuestionCard(data.payload);
                     } else if (data.type === 'client_count_update') {
-                        // 新增：更新实时在线人数的逻辑
                         document.getElementById('client-count').textContent = data.count;
+                    } else if (data.type === 'question_deleted') {
+                        // 新增：处理问题被删除的消息
+                        const questionId = data.payload.questionId;
+                        const cardToRemove = document.querySelector(`.card[data-question-id="${questionId}"]`);
+                        if (cardToRemove) {
+                            removeCard(cardToRemove);
+                        }
                     }
                 } catch (e) { console.error("解析消息失败: ", e); }
             };
@@ -88,20 +130,59 @@
                 ws.close();
             };
         }
+
         function createQuestionCard(questionData) {
             const wall = document.getElementById('card-wall');
             const card = document.createElement('div');
             card.className = 'card';
+            // 1. 在卡片上存储问题的唯一ID
+            card.dataset.questionId = questionData._id;
+
             const questionText = document.createElement('div');
             questionText.className = 'question-text';
             questionText.textContent = questionData.text;
+
             const authorName = document.createElement('div');
             authorName.className = 'author-name';
             authorName.textContent = `— ${questionData.name}`;
+
+            // 2. 创建删除按钮
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.innerHTML = '&times;'; // '×' 符号
+            deleteBtn.title = '删除问题';
+            
+            // 3. 为删除按钮添加点击事件
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); 
+                const questionId = e.target.closest('.card').dataset.questionId;
+                
+                if (confirm('您确定要从展示页移除这个问题吗？')) {
+                    fetch(`/api/questions/${questionId}`, {
+                        method: 'DELETE'
+                    }).catch(error => {
+                        console.error('删除请求失败:', error);
+                        alert('删除失败，请检查网络。');
+                    });
+                }
+            });
+
+            card.appendChild(deleteBtn);
             card.appendChild(questionText);
             card.appendChild(authorName);
+            
             wall.prepend(card);
         }
+
+        // 新增：移除卡片的函数（带动画）
+        function removeCard(cardElement) {
+            cardElement.classList.add('deleting');
+            // 等待动画结束后再从DOM中移除
+            setTimeout(() => {
+                cardElement.remove();
+            }, 400); // 动画时长为0.4秒
+        }
+
         async function loadInitialData() {
             try {
                 const response = await fetch(`/api/sessions/${sessionCode}`);
@@ -111,12 +192,14 @@
                 document.title = `${sessionName} - 问题墙`;
                 document.getElementById('session-title').textContent = sessionName;
                 document.getElementById('card-wall').innerHTML = '';
+                // 确保从后端获取的历史问题也包含 _id
                 data.questions.forEach(createQuestionCard);
             } catch(e) {
                 console.error(e);
                 document.body.innerHTML = `<h1>错误：无法加载场次 ${sessionCode}</h1>`;
             }
         }
+
         loadInitialData();
         connectWebSocket();
     </script>

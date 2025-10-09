@@ -94,7 +94,8 @@ app.get('/api/sessions/:code', async (req, res) => {
         const session = await Session.findOne({ code: req.params.code });
         if (!session) return res.status(404).json({ message: '场次不存在' });
         
-        const questions = await Question.find({ sessionId: session._id }).sort({ createdAt: 1 });
+        // .lean() 可以让返回的对象更轻量，并确保 _id 可用
+        const questions = await Question.find({ sessionId: session._id }).sort({ createdAt: 1 }).lean();
         res.json({ session, questions });
     } catch (e) {
         res.status(500).json({ message: '获取场次信息失败' });
@@ -113,13 +114,49 @@ app.post('/api/ask/:code', async (req, res) => {
 
         broadcastToRoom(session.code, {
             type: 'new_question',
-            payload: { text: newQuestion.text, name: newQuestion.name }
+            payload: { 
+                _id: newQuestion._id, // <-- 关键新增
+                text: newQuestion.text,
+                name: newQuestion.name
+            }
         });
         res.status(200).json({ message: '问题已收到' });
+    } catch (e) { /* ... */ }
+});
+
+//删除问题
+app.delete('/api/questions/:id', async (req, res) => {
+    try {
+        const questionId = req.params.id;
+        // 验证ID格式是否正确
+        if (!mongoose.Types.ObjectId.isValid(questionId)) {
+            return res.status(400).json({ message: '无效的问题ID' });
+        }
+
+        // 找到并删除问题，同时获取到被删除问题的信息
+        const deletedQuestion = await Question.findByIdAndDelete(questionId);
+
+        if (!deletedQuestion) {
+            return res.status(404).json({ message: '问题未找到或已被删除' });
+        }
+
+        // 找到该问题所属的场次，以便知道要向哪个房间广播
+        const session = await Session.findById(deletedQuestion.sessionId);
+        if (session) {
+            // 广播删除消息
+            broadcastToRoom(session.code, {
+                type: 'question_deleted',
+                payload: { questionId: deletedQuestion._id }
+            });
+        }
+
+        res.status(200).json({ message: '问题已成功删除' });
     } catch (e) {
-        res.status(500).json({ message: '提交失败' });
+        console.error("删除问题失败:", e);
+        res.status(500).json({ message: '服务器错误' });
     }
 });
+
 
 // admin页面用于获取特定时间段问题的API接口
 app.get('/api/questions', adminAuth, async (req, res) => {

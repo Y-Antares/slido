@@ -4,45 +4,73 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
+const mongoose = require('mongoose'); // 引入 mongoose
+
+// --- 数据库连接 ---
+// 从环境变量获取连接字符串，这是最佳实践
+const MONGO_URI = process.env.MONGO_URI; 
+
+mongoose.connect(MONGO_URI)
+    .then(() => console.log('成功连接到 MongoDB Atlas'))
+    .catch(err => console.error('连接 MongoDB 失败:', err));
+
+// 定义一个数据模型 (Schema)
+const questionSchema = new mongoose.Schema({
+    text: String,
+    createdAt: { type: Date, default: Date.now }
+});
+const Question = mongoose.model('Question', questionSchema);
+// --- 数据库部分结束 ---
+
 
 const app = express();
-// 使用 express.json() 中间件来解析JSON格式的请求体
 app.use(express.json());
-// 托管 public 文件夹中的静态文件 (HTML, CSS, JS)
 app.use(express.static(path.join(__dirname, 'public')));
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// 监听WebSocket连接
-wss.on('connection', (ws) => {
-    console.log('一个展示页(Presenter)已连接');
-    ws.on('close', () => {
-        console.log('一个展示页(Presenter)已断开连接');
-    });
-});
+wss.on('connection', ws => { /* ... */ });
 
-// 创建一个API端点，用于接收学生提交的问题
-app.post('/ask', (req, res) => {
+// 修改 /ask 接口以使用数据库
+app.post('/ask', async (req, res) => { // 注意这里改成了 async
     const { question } = req.body;
     if (question) {
-        console.log(`收到新问题: ${question}`);
+        try {
+            // 1. 创建一个新的问题实例
+            const newQuestion = new Question({ text: question });
+            // 2. 保存到数据库
+            await newQuestion.save();
+            console.log(`问题已成功保存到数据库: ${question}`);
 
-        // 将新问题广播给所有连接的展示页
-        wss.clients.forEach((client) => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(JSON.stringify({ type: 'new_question', payload: question }));
-            }
-        });
-
-        res.status(200).json({ message: '问题已收到' });
+            // 3. 广播给前端 (不变)
+            wss.clients.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify({ type: 'new_question', payload: question }));
+                }
+            });
+            res.status(200).json({ message: '问题已收到！' });
+        } catch (err) {
+            console.error('保存问题到数据库失败:', err);
+            res.status(500).json({ message: '服务器内部错误' });
+        }
     } else {
-        res.status(400).json({ message: '问题不能为空' });
+        res.status(400).json({ message: '问题不能为空！' });
     }
 });
+
+// (可选) 新增一个接口，用于查看所有已保存的问题
+app.get('/questions', async (req, res) => {
+    try {
+        const allQuestions = await Question.find().sort({ createdAt: -1 }); // 按时间倒序
+        res.json(allQuestions);
+    } catch (err) {
+        res.status(500).json({ message: '获取问题失败' });
+    }
+});
+
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`服务器正在运行于 http://localhost:${PORT}`);
-    console.log(`请在浏览器中打开 http://localhost:${PORT}/presenter.html`);
 });

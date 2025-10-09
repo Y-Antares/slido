@@ -8,16 +8,7 @@
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f4f4; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
         .form-container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 90%; max-width: 500px; }
         h1 { text-align: center; margin-top: 0; }
-        /* 为新的名字输入框添加样式 */
-        input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-            font-size: 16px;
-            margin-bottom: 15px; /* 和下面的文本框拉开距离 */
-            box-sizing: border-box;
-        }
+        input[type="text"] { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 16px; margin-bottom: 15px; box-sizing: border-box; }
         textarea { width: 100%; height: 100px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 16px; margin-bottom: 20px; box-sizing: border-box; }
         button { width: 100%; padding: 15px; border: none; background-color: #007bff; color: white; font-size: 18px; border-radius: 5px; cursor: pointer; }
         button:hover { background-color: #0056b3; }
@@ -36,23 +27,27 @@
     </div>
 
     <script>
+        // 1. 从URL中获取场次代码, 例如 /session/ABCDE/ask -> ABCDE
+        const pathParts = window.location.pathname.split('/');
+        const sessionCode = pathParts[pathParts.length - 2];
+
         const form = document.getElementById('question-form');
-        const nameInput = document.getElementById('name-input'); // 2. 获取名字输入框元素
+        const nameInput = document.getElementById('name-input');
         const questionInput = document.getElementById('question-input');
         const messageEl = document.getElementById('message');
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const question = questionInput.value.trim();
-            const name = nameInput.value.trim(); // 3. 获取名字的值
+            const name = nameInput.value.trim();
 
             if (!question) return;
 
             try {
-                const response = await fetch('/ask', {
+                // 2. 将问题提交到带有场次代码的动态URL
+                const response = await fetch(`/api/ask/${sessionCode}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    // 4. 将名字和问题一起打包发送
                     body: JSON.stringify({ 
                         question: question,
                         name: name 
@@ -60,20 +55,20 @@
                 });
 
                 if (response.ok) {
-                    questionInput.value = ''; // 提交后清空问题框
-                    // 名字输入框可以选择不清空，方便用户连续提问
+                    questionInput.value = '';
                     messageEl.textContent = '✅ 提交成功！';
                     setTimeout(() => messageEl.textContent = '', 2000);
                 } else {
-                    throw new Error('提交失败');
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || '提交失败');
                 }
             } catch (error) {
-                messageEl.textContent = '❌ 提交失败，请重试。';
+                messageEl.textContent = `❌ ${error.message}`;
                 messageEl.style.color = 'red';
                 setTimeout(() => {
                     messageEl.textContent = '';
                     messageEl.style.color = 'green';
-                }, 2000);
+                }, 3000);
             }
         });
     </script>

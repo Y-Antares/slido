@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>我的仪表盘</title>
+    <style>/* ... (可以添加一些美化样式) ... */</style>
+</head>
+<body>
+    <h1>我的活动场次</h1>
+    <div>
+        <h2>创建新场次</h2>
+        <input type="text" id="session-name" placeholder="输入课程或活动名称">
+        <button id="create-btn">创建</button>
+    </div>
+    <hr>
+    <h2>历史场次</h2>
+    <div id="sessions-list"></div>
+
+    <script>
+        const createBtn = document.getElementById('create-btn');
+        const sessionNameInput = document.getElementById('session-name');
+        const sessionsListDiv = document.getElementById('sessions-list');
+
+        async function fetchSessions() {
+            const response = await fetch('/api/sessions');
+            const sessions = await response.json();
+            sessionsListDiv.innerHTML = '';
+            sessions.forEach(s => {
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    <h3>${s.name} (代码: ${s.code})</h3>
+                    <p>创建于: ${new Date(s.createdAt).toLocaleString()}</p>
+                    <p>
+                        <a href="/session/${s.code}" target="_blank">打开展示页</a> | 
+                        <a href="/session/${s.code}/ask" target="_blank">打开提问页 (用于生成二维码)</a>
+                    </p>
+                `;
+                sessionsListDiv.appendChild(div);
+            });
+        }
+
+        createBtn.addEventListener('click', async () => {
+            const name = sessionNameInput.value.trim();
+            if (!name) return alert('名称不能为空');
+            await fetch('/api/sessions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            });
+            sessionNameInput.value = '';
+            fetchSessions();
+        });
+
+        fetchSessions();
+    </script>
+</body>
+</html>

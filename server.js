@@ -1,130 +1,175 @@
-// --- 依赖引入 (Dependencies) ---
+// server.js
+
+// --- 依赖引入 ---
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const mongoose = require('mongoose');
-const basicAuth = require('express-basic-auth'); // 用于后台页面密码保护
+const basicAuth = require('express-basic-auth');
+const { nanoid } = require('nanoid'); // 引入 nanoid
 
-// --- 数据库设置 (Database Setup) ---
-// 从环境变量获取MongoDB连接字符串
-const MONGO_URI = process.env.MONGO_URI; 
-
-// 连接到MongoDB Atlas
+// --- 数据库连接 (不变) ---
+const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI)
     .then(() => console.log('成功连接到 MongoDB Atlas'))
     .catch(err => console.error('连接 MongoDB 失败:', err));
 
-// 定义问题的数据模型 (Schema)，包含问题内容、提问人姓名和创建时间
+// --- 数据模型重构 ---
+// 1. 新增：场次 (Session) 的数据模型
+const sessionSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    code: { type: String, required: true, unique: true, default: () => nanoid(6) }, // 6位唯一代码
+    createdAt: { type: Date, default: Date.now }
+});
+const Session = mongoose.model('Session', sessionSchema);
+
+// 2. 修改：问题 (Question) 的数据模型，增加 sessionId 字段
 const questionSchema = new mongoose.Schema({
     text: String,
     name: { type: String, default: '匿名' },
+    sessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Session', required: true }, // 关联到场次
     createdAt: { type: Date, default: Date.now }
 });
 const Question = mongoose.model('Question', questionSchema);
 
 // --- Express 应用初始化 ---
 const app = express();
+app.use(express.json());
 
-// --- 安全与中间件 (Security & Middleware) ---
-// 配置后台页面的HTTP Basic Authentication
-// 用户名和密码从环境变量中读取，确保安全
+// --- 安全与中间件 ---
 const adminAuth = basicAuth({
-    users: { 
-        [process.env.ADMIN_USERNAME]: process.env.ADMIN_PASSWORD 
-    },
-    challenge: true, // 验证失败时，浏览器会弹出登录窗口
+    users: { [process.env.ADMIN_USERNAME]: process.env.ADMIN_PASSWORD },
+    challenge: true,
 });
 
-// --- 路由定义 (Routes) ---
+// --- 路由定义 (完全重构) ---
 
-// 1. 保护后台管理页面路由
-// 只有通过了 adminAuth 验证的用户才能访问 admin.html
-app.get('/admin.html', adminAuth, (req, res) => {
+// 托管 public 文件夹中的静态文件（如 CSS, JS 库等）
+app.use(express.static(path.join(__dirname, 'public')));
+
+// 1. 主页/仪表盘路由 (受密码保护)
+app.get('/', adminAuth, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
+// 2. 场次展示页和提问页路由 (公开访问)
+app.get('/session/:code', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'presenter.html'));
+});
+app.get('/session/:code/ask', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'client.html'));
+});
+
+// 3. 管理员后台路由 (admin.html 被 dashboard.html 替代)
+app.get('/admin', adminAuth, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-// 2. 托管 public 文件夹中的静态文件（如 presenter.html, client.html, CSS等）
-app.use(express.static(path.join(__dirname, 'public')));
+// --- API 接口 (完全重构) ---
 
-// 3. 使用 Express JSON 中间件来解析请求体
-app.use(express.json());
-
-// 4. 当用户访问根目录时，自动跳转到展示页面
-app.get('/', (req, res) => {
-    res.redirect('/presenter.html');
-});
-
-// 5. 学生提交问题的API接口
-app.post('/ask', async (req, res) => {
-    const { question, name } = req.body; 
-
-    if (question) {
-        try {
-            const newQuestion = new Question({
-                text: question,
-                name: name || '匿名' 
-            });
-            await newQuestion.save();
-            console.log(`问题已保存: "${question}" by ${newQuestion.name}`);
-
-            // 通过WebSocket将新问题广播给所有连接的展示页
-            wss.clients.forEach(client => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(JSON.stringify({
-                        type: 'new_question',
-                        payload: { 
-                            text: newQuestion.text,
-                            name: newQuestion.name
-                        }
-                    }));
-                }
-            });
-            res.status(200).json({ message: '问题已收到' });
-        } catch (err) {
-            console.error('保存问题到数据库失败:', err);
-            res.status(500).json({ message: '服务器内部错误' });
-        }
-    } else {
-        res.status(400).json({ message: '问题不能为空' });
-    }
-});
-
-// 6. 后台管理页面用于获取特定时间段问题的API接口
-app.get('/api/questions', async (req, res) => {
-    const { start, end } = req.query;
-
-    if (!start || !end) {
-        return res.status(400).json({ message: '必须提供开始(start)和结束(end)时间参数' });
-    }
-
+// a. 创建新场次
+app.post('/api/sessions', adminAuth, async (req, res) => {
     try {
-        const query = {
-            createdAt: {
-                $gte: new Date(start), 
-                $lte: new Date(end)
-            }
-        };
-        const filteredQuestions = await Question.find(query).sort({ createdAt: 1 });
-        res.status(200).json(filteredQuestions);
-    } catch (error) {
-        console.error('获取问题失败:', error);
-        res.status(500).json({ message: '服务器错误' });
+        const newSession = new Session({ name: req.body.name });
+        await newSession.save();
+        res.status(201).json(newSession);
+    } catch (e) {
+        res.status(500).json({ message: '创建失败' });
     }
 });
 
-// --- 服务器与WebSocket设置 ---
+// b. 获取所有场次列表
+app.get('/api/sessions', adminAuth, async (req, res) => {
+    try {
+        const sessions = await Session.find().sort({ createdAt: -1 });
+        res.json(sessions);
+    } catch (e) {
+        res.status(500).json({ message: '获取列表失败' });
+    }
+});
+
+// c. 获取单个场次的详细信息和所有历史问题
+app.get('/api/sessions/:code', async (req, res) => {
+    try {
+        const session = await Session.findOne({ code: req.params.code });
+        if (!session) return res.status(404).json({ message: '场次不存在' });
+        
+        const questions = await Question.find({ sessionId: session._id }).sort({ createdAt: 1 });
+        res.json({ session, questions });
+    } catch (e) {
+        res.status(500).json({ message: '获取场次信息失败' });
+    }
+});
+
+// d. 提交新问题 (现在需要场次代码)
+app.post('/api/ask/:code', async (req, res) => {
+    const { question, name } = req.body;
+    try {
+        const session = await Session.findOne({ code: req.params.code });
+        if (!session) return res.status(404).json({ message: '场次不存在' });
+
+        const newQuestion = new Question({ text: question, name: name || '匿名', sessionId: session._id });
+        await newQuestion.save();
+
+        // 通过WebSocket广播新问题到对应的房间
+        broadcastToRoom(session.code, {
+            type: 'new_question',
+            payload: { text: newQuestion.text, name: newQuestion.name }
+        });
+        res.status(200).json({ message: '问题已收到' });
+    } catch (e) {
+        res.status(500).json({ message: '提交失败' });
+    }
+});
+
+// --- 服务器与WebSocket升级 (增加房间逻辑) ---
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// 使用 Map 来存储房间和客户端的对应关系
+const rooms = new Map();
+
 wss.on('connection', (ws) => {
-    console.log('一个展示页(Presenter)已连接');
+    ws.on('message', (message) => {
+        try {
+            const data = JSON.parse(message);
+            // 当客户端连接时，会发送一个 'join' 消息来加入房间
+            if (data.type === 'join' && data.room) {
+                const roomCode = data.room;
+                ws.roomCode = roomCode; // 在ws对象上存下房间号
+
+                if (!rooms.has(roomCode)) {
+                    rooms.set(roomCode, new Set());
+                }
+                rooms.get(roomCode).add(ws);
+                console.log(`一个客户端加入了房间: ${roomCode}`);
+            }
+        } catch (e) {
+            console.error("解析消息失败", e);
+        }
+    });
+
     ws.on('close', () => {
-        console.log('一个展示页(Presenter)已断开连接');
+        // 当客户端断开时，将它从房间中移除
+        if (ws.roomCode && rooms.has(ws.roomCode)) {
+            rooms.get(ws.roomCode).delete(ws);
+            console.log(`一个客户端离开了房间: ${ws.roomCode}`);
+        }
     });
 });
 
-// --- 启动服务器 ---
+function broadcastToRoom(roomCode, data) {
+    if (rooms.has(roomCode)) {
+        rooms.get(roomCode).forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify(data));
+            }
+        });
+    }
+}
+
+// --- 启动服务器 (不变) ---
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`服务器正在运行于端口 ${PORT}`);

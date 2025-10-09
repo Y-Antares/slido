@@ -8,9 +8,8 @@
     <style>
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
-            /* 1. 背景改为Slido深蓝色 */
             background-color: #1D224D;
-            color: #ffffff; /* 基础文字颜色改为白色 */
+            color: #ffffff; 
             margin: 0; 
             padding: 20px; 
             overflow: hidden; 
@@ -22,7 +21,6 @@
         .sidebar { 
             width: 250px; 
             padding: 20px; 
-            /* 2. 侧边栏颜色调整以适应深色背景 */
             background-color: #2C3053; 
             border-radius: 12px; 
             text-align: center; 
@@ -53,29 +51,17 @@
             flex-wrap: wrap;
             align-content: flex-start;
             gap: 20px;
-            overflow-y: auto; /* 当卡片过多时，允许垂直滚动 */
-            padding: 5px; /* 防止滚动条紧贴卡片 */
+            overflow-y: auto;
+            padding: 5px;
         }
-
-        /* 自定义滚动条样式 (可选，美化) */
-        .card-wall::-webkit-scrollbar {
-            width: 8px;
-        }
-        .card-wall::-webkit-scrollbar-track {
-            background: #2C3053;
-            border-radius: 4px;
-        }
-        .card-wall::-webkit-scrollbar-thumb {
-            background: #4A5073;
-            border-radius: 4px;
-        }
-        .card-wall::-webkit-scrollbar-thumb:hover {
-            background: #5E6591;
-        }
+        .card-wall::-webkit-scrollbar { width: 8px; }
+        .card-wall::-webkit-scrollbar-track { background: #2C3053; border-radius: 4px; }
+        .card-wall::-webkit-scrollbar-thumb { background: #4A5073; border-radius: 4px; }
+        .card-wall::-webkit-scrollbar-thumb:hover { background: #5E6591; }
 
         .card {
             background-color: #fff;
-            color: #333; /* 卡片内文字颜色为深色 */
+            color: #333;
             border-radius: 8px;
             padding: 20px;
             width: calc(33.333% - 27px);
@@ -87,57 +73,18 @@
             animation: fadeIn 0.5s ease;
             transition: transform 0.2s ease;
         }
-        .card:hover {
-            transform: translateY(-5px); /* 鼠标悬浮时轻微上移 */
-        }
-        .card .question-text {
-            font-size: 20px;
-            line-height: 1.4;
-            word-wrap: break-word;
-        }
-        .card .author-name {
-            font-size: 14px;
-            font-weight: 500;
-            color: #555;
-            text-align: right;
-            margin-top: 15px;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* 响应式布局：当屏幕宽度小于900px时，每行显示2个卡片 */
-        @media (max-width: 900px) {
-            .card {
-                width: calc(50% - 25px);
-            }
-        }
-        /* 响应式布局：当屏幕宽度小于600px时，每行显示1个卡片 */
-        @media (max-width: 600px) {
-            .container {
-                flex-direction: column;
-                height: auto;
-            }
-            .sidebar {
-                width: auto;
-                margin-bottom: 20px;
-            }
-            .card-wall {
-                margin-left: 0;
-            }
-            .card {
-                width: 100%;
-                min-width: unset;
-            }
-        }
+        .card:hover { transform: translateY(-5px); }
+        .card .question-text { font-size: 20px; line-height: 1.4; word-wrap: break-word; }
+        .card .author-name { font-size: 14px; font-weight: 500; color: #555; text-align: right; margin-top: 15px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 900px) { .card { width: calc(50% - 25px); } }
+        @media (max-width: 600px) { .container { flex-direction: column; height: auto; } .sidebar { width: auto; margin-bottom: 20px; } .card-wall { margin-left: 0; } .card { width: 100%; min-width: unset; } }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="sidebar">
-            <h2>加入互动</h2>
+            <h2 id="session-title">加载中...</h2>
             <div id="qrcode-container">
                 <p>手机扫码提问</p>
                 <div id="qrcode"></div>
@@ -148,19 +95,23 @@
     </div>
 
     <script>
-        // --- 二维码生成 ---
-        const clientUrl = `${window.location.protocol}//${window.location.host}/client.html`;
+        // 1. 从URL中获取场次代码, 例如 /session/ABCDE -> ABCDE
+        const pathParts = window.location.pathname.split('/');
+        const sessionCode = pathParts[pathParts.length - 1];
+
+        // 2. 生成指向本场次提问页的二维码
+        const clientUrl = `${window.location.protocol}//${window.location.host}/session/${sessionCode}/ask`;
         try {
             const qr = qrcode(4, 'L');
             qr.addData(clientUrl);
             qr.make();
-            document.getElementById('qrcode').innerHTML = qr.createImgTag(5, 5); // size, margin
+            document.getElementById('qrcode').innerHTML = qr.createImgTag(5, 5);
         } catch (e) {
             console.error("二维码生成失败: ", e);
             document.getElementById('qrcode').textContent = "二维码加载失败";
         }
         
-        // --- WebSocket 连接 ---
+        // 3. WebSocket 连接并加入指定房间
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${wsProtocol}//${window.location.host}`;
         let ws;
@@ -170,6 +121,8 @@
 
             ws.onopen = () => {
                 console.log('成功连接到WebSocket服务器');
+                // 连接成功后，立即发送 'join' 消息，告诉服务器要加入哪个房间
+                ws.send(JSON.stringify({ type: 'join', room: sessionCode }));
             };
 
             ws.onmessage = (event) => {
@@ -178,14 +131,12 @@
                     if (data.type === 'new_question') {
                         createQuestionCard(data.payload);
                     }
-                } catch (e) {
-                    console.error("解析消息失败: ", e);
-                }
+                } catch (e) { console.error("解析消息失败: ", e); }
             };
 
             ws.onclose = () => {
-                console.log('与WebSocket服务器断开连接，尝试1秒后重连...');
-                setTimeout(connectWebSocket, 1000); // 断线重连
+                console.log('WebSocket连接断开，1秒后重连...');
+                setTimeout(connectWebSocket, 1000);
             };
 
             ws.onerror = (error) => {
@@ -194,33 +145,46 @@
             };
         }
 
-        // --- 创建问题卡片 ---
+        // 4. 创建问题卡片的函数 (不变)
         function createQuestionCard(questionData) {
             const wall = document.getElementById('card-wall');
-            
-            // 创建卡片的基本结构
             const card = document.createElement('div');
             card.className = 'card';
-
-            // 创建显示问题的部分
             const questionText = document.createElement('div');
             questionText.className = 'question-text';
             questionText.textContent = questionData.text;
-
-            // 创建显示作者的部分
             const authorName = document.createElement('div');
             authorName.className = 'author-name';
             authorName.textContent = `— ${questionData.name}`;
-
-            // 把各部分组装起来
             card.appendChild(questionText);
             card.appendChild(authorName);
-            
-            // 将新卡片添加到墙的最前面
             wall.prepend(card);
         }
 
-        // 启动 WebSocket 连接
+        // 5. 页面加载时，获取本场次的历史信息和问题
+        async function loadInitialData() {
+            try {
+                const response = await fetch(`/api/sessions/${sessionCode}`);
+                if (!response.ok) throw new Error('场次不存在或加载失败');
+                const data = await response.json();
+                
+                // 设置页面标题和侧边栏标题
+                const sessionName = data.session.name;
+                document.title = `${sessionName} - 问题墙`;
+                document.getElementById('session-title').textContent = sessionName;
+
+                // 清空旧内容并渲染历史问题
+                document.getElementById('card-wall').innerHTML = '';
+                data.questions.forEach(createQuestionCard);
+
+            } catch(e) {
+                console.error(e);
+                document.body.innerHTML = `<h1>错误：无法加载场次 ${sessionCode}</h1>`;
+            }
+        }
+
+        // 启动所有功能
+        loadInitialData();
         connectWebSocket();
     </script>
 </body>

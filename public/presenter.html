@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>问题展示墙</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #1a1a1a; color: white; margin: 0; padding: 20px; overflow: hidden; }
+        .container { display: flex; height: calc(100vh - 40px); }
+        .sidebar { width: 250px; padding: 20px; background-color: #333; border-radius: 10px; text-align: center; }
+        .sidebar h2 { margin-top: 0; }
+        #qrcode { display: flex; justify-content: center; align-items: center; padding: 10px; background: white; border-radius: 5px; }
+        .danmaku-container { position: relative; flex-grow: 1; margin-left: 20px; }
+        .bubble {
+            position: absolute;
+            background-color: rgba(52, 152, 219, 0.8);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 50px;
+            font-size: 24px;
+            white-space: nowrap;
+            animation: float-across 15s linear forwards;
+            opacity: 0;
+        }
+        @keyframes float-across {
+            0% { transform: translateX(100vw); opacity: 1; }
+            100% { transform: translateX(-100%); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>手机扫码提问</h2>
+            <div id="qrcode"></div>
+        </div>
+        <div id="danmaku-container" class="danmaku-container">
+            </div>
+    </div>
+
+    <script>
+        // 1. 生成二维码
+        const clientUrl = `${window.location.protocol}//${window.location.host}/client.html`;
+        const typeNumber = 4;
+        const errorCorrectionLevel = 'L';
+        const qr = qrcode(typeNumber, errorCorrectionLevel);
+        qr.addData(clientUrl);
+        qr.make();
+        document.getElementById('qrcode').innerHTML = qr.createImgTag(6);
+
+        // 2. 连接 WebSocket 服务器
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${wsProtocol}//${window.location.host}`);
+
+        ws.onopen = () => {
+            console.log('成功连接到WebSocket服务器');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'new_question') {
+                createBubble(data.payload);
+            }
+        };
+
+        ws.onclose = () => {
+            console.log('与WebSocket服务器断开连接');
+        };
+
+        // 3. 创建问题气泡/弹幕
+        function createBubble(text) {
+            const container = document.getElementById('danmaku-container');
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.textContent = text;
+
+            // 随机垂直位置
+            const randomTop = Math.random() * (container.clientHeight - 60); // 减去气泡高度
+            bubble.style.top = `${randomTop}px`;
+            
+            container.appendChild(bubble);
+
+            // 动画结束后移除元素，避免内存泄漏
+            setTimeout(() => {
+                bubble.remove();
+            }, 15000); // 动画时长为15秒
+        }
+    </script>
+</body>
+</html>

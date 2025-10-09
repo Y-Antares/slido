@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>提问</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f4f4; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .form-container { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 90%; max-width: 500px; }
+        h1 { text-align: center; margin-top: 0; }
+        textarea { width: 100%; height: 100px; padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 16px; margin-bottom: 20px; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; border: none; background-color: #007bff; color: white; font-size: 18px; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .message { text-align: center; color: green; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h1>输入你的问题</h1>
+        <form id="question-form">
+            <textarea id="question-input" placeholder="请在这里输入..." required></textarea>
+            <button type="submit">提交</button>
+        </form>
+        <p id="message" class="message"></p>
+    </div>
+
+    <script>
+        const form = document.getElementById('question-form');
+        const input = document.getElementById('question-input');
+        const messageEl = document.getElementById('message');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const question = input.value.trim();
+            if (!question) return;
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: question })
+                });
+
+                if (response.ok) {
+                    input.value = '';
+                    messageEl.textContent = '✅ 提交成功！';
+                    setTimeout(() => messageEl.textContent = '', 2000);
+                } else {
+                    throw new Error('提交失败');
+                }
+            } catch (error) {
+                messageEl.textContent = '❌ 提交失败，请重试。';
+                messageEl.style.color = 'red';
+                setTimeout(() => {
+                    messageEl.textContent = '';
+                    messageEl.style.color = 'green';
+                }, 2000);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -242,4 +242,7 @@ function broadcastToRoom(roomCode, data) {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`服务器正在运行于端口 ${PORT}`);
+    console.log("--- 环境变量诊断信息 ---");
+    console.log(`读取到的 ADMIN_USERNAME: [${process.env.ADMIN_USERNAME}]`);
+    console.log(`读取到的 ADMIN_PASSWORD: [${process.env.ADMIN_PASSWORD}]`);
 });

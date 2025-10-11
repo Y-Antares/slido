@@ -108,14 +108,32 @@ app.use(express.static(path.join(__dirname, 'public')));
 // --- API 接口定义 ---
 
 // a. 处理登录请求的API
+// a. 处理登录请求的API (*** 核心修改区域 ***)
 app.post('/login', (req, res) => {
+    // --- 黑匣子诊断开始 ---
+    console.log("--- [Login Attempt] ---");
+    console.log(`[1] 收到登录请求。时间: ${new Date().toISOString()}`);
+
     const { username, password } = req.body;
-    if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
-        req.session.isAuthenticated = true; // 认证成功，在session中设置标志
+    console.log(`[2] 从浏览器收到的数据: 用户名='${username}', 密码='${password}'`);
+
+    const env_user = process.env.ADMIN_USERNAME;
+    const env_pass = process.env.ADMIN_PASSWORD;
+    console.log(`[3] 从Render环境变量读取的数据: 用户名='${env_user}', 密码='${env_pass}'`);
+
+    const isMatch = (username === env_user && password === env_pass);
+    console.log(`[4] 比对结果 (是否匹配): ${isMatch}`);
+    // --- 黑匣子诊断结束 ---
+
+    if (isMatch) {
+        req.session.isAuthenticated = true; // 认证成功
+        console.log("[5] 认证成功，设置Session并返回200 OK。");
         res.status(200).json({ message: 'Login successful' });
     } else {
+        console.log("[5] 认证失败，返回401 Unauthorized。");
         res.status(401).json({ message: 'Invalid credentials' });
     }
+    console.log("--- [End of Login Attempt] ---\n");
 });
 
 // b. 创建新场次 (受保护)

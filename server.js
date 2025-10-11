@@ -6,6 +6,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 const session = require('express-session'); // 新增：Session管理
 const cookieParser = require('cookie-parser'); // 新增：Cookie解析
+const MongoStore = require('connect-mongo');
 const { nanoid } = require('nanoid');
 
 // --- 数据库设置 (Database Setup) ---
@@ -37,15 +38,23 @@ app.use(express.json());
 app.use(cookieParser()); // 使用 cookie-parser
 
 // --- Session认证系统配置 ---
+// --- Session认证系统配置 (升级) ---
 app.use(session({
-    secret: process.env.SESSION_SECRET, // 用于加密session的秘钥，必须在Render环境变量中设置
+    secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    // 2. 将 store 配置为 MongoStore
+    store: MongoStore.create({
+        mongoUrl: process.env.MONGO_URI, // 使用您的MongoDB连接字符串
+        ttl: 14 * 24 * 60 * 60, // Session有效期14天 (可选)
+        autoRemove: 'native' // 使用MongoDB原生的TTL功能自动清理过期Session
+    }),
     cookie: {
-        secure: process.env.NODE_ENV === 'production', // 在生产环境(https)下设为true
-        maxAge: 1000 * 60 * 60 * 24 * 7 // Cookie有效期设置为7天
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 1000 * 60 * 60 * 24 * 7 // Cookie有效期7天
     }
 }));
+
 
 // --- 新的认证守卫中间件 ---
 const checkAuth = (req, res, next) => {

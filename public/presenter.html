@@ -6,35 +6,18 @@
     <title>问题展示墙</title>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #1D224D; color: #ffffff; margin: 0; padding: 20px; overflow: hidden; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #1D224D; color: #ffffff; margin: 0; padding: 20px; }
         .container { display: flex; height: calc(100vh - 40px); }
         .sidebar { width: 250px; padding: 20px; background-color: #2C3053; border-radius: 12px; text-align: center; flex-shrink: 0; display: flex; flex-direction: column; }
         .sidebar h2 { margin-top: 0; color: #EFEFEF; }
         #qrcode-container { margin-top: 20px; padding: 15px; background: white; border-radius: 8px; }
         #qrcode-container p { color: #333; margin: 5px 0 10px; font-weight: bold; }
-        
-        /* 修改二维码容器内的布局，以容纳多个按钮 */
-        #qrcode-actions {
-            display: flex;
-            gap: 10px; /* 按钮之间的间距 */
-            margin-top: 10px;
-        }
-        #qrcode-actions button {
-            width: 100%;
-            padding: 8px 10px;
-            font-size: 0.9rem;
-            font-weight: 500;
-            border: none;
-            border-radius: 6px;
-            color: #EFEFEF;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-        }
+        #qrcode-actions { display: flex; gap: 10px; margin-top: 10px; }
+        #qrcode-actions button { width: 100%; padding: 8px 10px; font-size: 0.9rem; font-weight: 500; border: none; border-radius: 6px; color: #EFEFEF; cursor: pointer; transition: background-color 0.2s ease; }
         #copy-qr-btn { background-color: #4A5073; }
         #copy-qr-btn:hover { background-color: #5E6591; }
-        #download-qr-btn { background-color: #38C695; } /* 下载按钮用绿色 */
+        #download-qr-btn { background-color: #38C695; }
         #download-qr-btn:hover { background-color: #45e0a9; }
-        
         .live-counter { margin-top: auto; padding-top: 20px; border-top: 1px solid #4A5073; color: #EFEFEF; }
         .live-counter-number { font-size: 2.5rem; font-weight: bold; color: #38C695; }
         .live-counter-label { font-size: 1rem; color: #aaa; }
@@ -52,8 +35,24 @@
         .delete-btn:hover { background-color: #f44336; color: white; }
         .card.deleting { transition: opacity 0.4s ease, transform 0.4s ease; opacity: 0; transform: scale(0.95); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- 滑动问题修复的关键修改 --- */
+        /* 仅在桌面端 (宽度 > 600px) 时锁定body滚动 */
+        @media (min-width: 601px) {
+            body {
+                overflow: hidden;
+            }
+        }
+        
         @media (max-width: 900px) { .card { width: calc(50% - 25px); } }
-        @media (max-width: 600px) { .container { flex-direction: column; height: auto; } .sidebar { width: auto; margin-bottom: 20px; } .card-wall { margin-left: 0; } .card { width: 100%; min-width: unset; } }
+        
+        @media (max-width: 600px) { 
+            body { overflow: auto; /* 在手机上允许body滚动 */ }
+            .container { flex-direction: column; height: auto; } 
+            .sidebar { width: auto; margin-bottom: 20px; } 
+            .card-wall { margin-left: 0; overflow-y: visible; /* 卡片墙不再独立滚动 */ } 
+            .card { width: 100%; min-width: unset; } 
+        }
     </style>
 </head>
 <body>
@@ -75,7 +74,7 @@
         </div>
         <div id="card-wall" class="card-wall"></div>
     </div>
-
+    
     <script>
         // --- 变量定义 ---
         const pathParts = window.location.pathname.split('/');

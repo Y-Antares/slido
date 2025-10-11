@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>管理员登录</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f2f5; margin: 0; }
-        .login-card { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px S.O 10px rgba(0,0,0,0.1); width: 300px; }
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f2f5; margin: 0; }
+        .login-card { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 300px; }
         .login-card h1 { text-align: center; margin-bottom: 20px; color: #333; }
         .login-card input { width: 100%; padding: 10px; margin-bottom: 15px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; font-size: 1rem; }
         .login-card button { width: 100%; padding: 10px; border: none; border-radius: 4px; background-color: #007bff; color: white; cursor: pointer; font-size: 1rem; }
@@ -17,43 +17,59 @@
     <div class="login-card">
         <h1>管理员登录</h1>
         <form id="login-form">
-            <input type="text" id="username" placeholder="用户名" required>
-            <input type="password" id="password" placeholder="密码" required>
+            <input type="text" id="username" placeholder="用户名" required autocomplete="username">
+            <input type="password" id="password" placeholder="密码" required autocomplete="current-password">
             <button type="submit">登录</button>
         </form>
         <p id="error-message" class="error"></p>
     </div>
+
     <script>
+        // 2. 植入探针：在脚本最开始打印一条信息
+        console.log("Login script has started executing!");
+
         const form = document.getElementById('login-form');
         const errorMessageElement = document.getElementById('error-message');
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            errorMessageElement.textContent = ''; // Clear previous error
+        // 增加一个检查，以防万一
+        if (form) {
+            console.log("Found the login form successfully.");
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                console.log("Submit event captured, preventDefault called."); // 确认“刹车”已踩下
+                errorMessageElement.textContent = '';
 
-            const usernameInput = document.getElementById('username');
-            const passwordInput = document.getElementById('password');
+                const usernameInput = document.getElementById('username');
+                const passwordInput = document.getElementById('password');
 
-            try {
-                const response = await fetch('/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        username: usernameInput.value, 
-                        password: passwordInput.value 
-                    })
-                });
+                try {
+                    console.log("Sending fetch request to /login...");
+                    const response = await fetch('/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            username: usernameInput.value, 
+                            password: passwordInput.value 
+                        })
+                    });
 
-                if (response.ok) {
-                    window.location.href = '/'; // Login successful, redirect to dashboard
-                } else {
-                    errorMessageElement.textContent = '用户名或密码错误。';
+                    console.log("Fetch response received with status:", response.status);
+                    if (response.ok) {
+                        console.log("Response is OK, redirecting to /");
+                        window.location.href = '/';
+                    } else {
+                        console.log("Response is NOT OK, showing error message.");
+                        errorMessageElement.textContent = '用户名或密码错误。';
+                    }
+                } catch (error) {
+                    console.error('Login request failed:', error);
+                    errorMessageElement.textContent = '登录请求失败，请检查网络。';
                 }
-            } catch (error) {
-                console.error('Login request failed:', error);
-                errorMessageElement.textContent = '登录请求失败，请检查网络。';
-            }
-        });
+            });
+        } else {
+            // 如果没找到表单，这会是唯一且致命的错误
+            console.error("CRITICAL ERROR: Could not find the element with id 'login-form'.");
+        }
     </script>
 </body>
 </html>

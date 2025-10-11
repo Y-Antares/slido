@@ -110,32 +110,23 @@ app.use(express.static(path.join(__dirname, 'public')));
 // a. 处理登录请求的API
 // a. 处理登录请求的API (*** 核心修改区域 ***)
 app.post('/login', (req, res) => {
-    console.log("--- [Login Attempt with Hardcoded Values] ---");
-    
-    // 从浏览器请求中获取用户输入
     const { username, password } = req.body;
-    console.log(`[1] 浏览器提交的数据: 用户名='${username}', 密码='${password}'`);
+    if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
+        // 1. 在 session 中设置认证标志
+        req.session.isAuthenticated = true;
 
-    // !!!!!!!!!!!!!!!!!! 终极诊断：在这里临时硬编码您的凭证 !!!!!!!!!!!!!!!!!!
-    // !!! 请务必替换成您在Render上设置的、确认无误的真实用户名和密码 !!!
-    const CORRECT_USERNAME = "admin"; 
-    const CORRECT_PASSWORD = "YanChaoYun123";
-    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-    console.log(`[2] 用于比对的硬编码数据: 用户名='${CORRECT_USERNAME}', 密码='${CORRECT_PASSWORD}'`);
-
-    const isMatch = (username === CORRECT_USERNAME && password === CORRECT_PASSWORD);
-    console.log(`[3] 比对结果 (是否匹配): ${isMatch}`);
-
-    if (isMatch) {
-        req.session.isAuthenticated = true; // 认证成功
-        console.log("[4] 认证成功，返回200 OK。");
-        res.status(200).json({ message: 'Login successful' });
+        // 2. 调用 req.session.save() 确保 session 已存入数据库
+        req.session.save((err) => {
+            if (err) {
+                console.error('Session save error:', err);
+                return res.status(500).json({ message: 'Session save failed' });
+            }
+            // 3. 在保存成功的回调函数中，才向前端返回成功响应
+            res.status(200).json({ message: 'Login successful' });
+        });
     } else {
-        console.log("[4] 认证失败，返回401 Unauthorized。");
         res.status(401).json({ message: 'Invalid credentials' });
     }
-    console.log("--- [End of Login Attempt] ---\n");
 });
 
 // b. 创建新场次 (受保护)

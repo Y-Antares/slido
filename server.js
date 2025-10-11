@@ -43,7 +43,7 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({
-        mongoUrl: process.env.MONGO_URI,
+        client: mongoose.connection.getClient(),
         collectionName: 'user_sessions', // <-- 关键修改在这里！指定一个新的集合名称
         ttl: 14 * 24 * 60 * 60,
         autoRemove: 'native'

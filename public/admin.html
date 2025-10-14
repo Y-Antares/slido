@@ -5,15 +5,15 @@
     <title>问题管理后台</title>
     <style>
         body { font-family: sans-serif; padding: 20px; }
-        .controls { margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; }
+        .controls { margin-bottom: 20px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
-        button { font-size: 16px; padding: 5px 10px; }
+        button { font-size: 16px; padding: 5px 10px; cursor: pointer; }
     </style>
 </head>
 <body>
-    <h1>问题管理后台</h1>
+    <h1>问题数据导出</h1>
     <div class="controls">
         <label for="start-time">开始时间:</label>
         <input type="datetime-local" id="start-time">
@@ -28,7 +28,7 @@
                 <th>时间</th>
                 <th>提问人</th>
                 <th>问题内容</th>
-            </tr>
+                <th>IP 地址</th> </tr>
         </thead>
         <tbody>
             </tbody>
@@ -38,16 +38,12 @@
         const fetchBtn = document.getElementById('fetch-btn');
         const exportBtn = document.getElementById('export-btn');
         const tableBody = document.querySelector('#questions-table tbody');
-        let currentQuestions = []; // 用于存储当前获取到的问题
+        let currentQuestions = [];
 
         fetchBtn.addEventListener('click', async () => {
             const startTime = document.getElementById('start-time').value;
             const endTime = document.getElementById('end-time').value;
-
-            if (!startTime || !endTime) {
-                alert('请选择开始和结束时间');
-                return;
-            }
+            if (!startTime || !endTime) { alert('请选择开始和结束时间'); return; }
 
             const startISO = new Date(startTime).toISOString();
             const endISO = new Date(endTime).toISOString();
@@ -55,7 +51,6 @@
             try {
                 const response = await fetch(`/api/questions?start=${startISO}&end=${endISO}`);
                 if (!response.ok) throw new Error('网络响应错误');
-                
                 currentQuestions = await response.json();
                 renderTable(currentQuestions);
             } catch (error) {
@@ -68,16 +63,17 @@
             tableBody.innerHTML = '';
             if (questions.length === 0) {
                 exportBtn.style.display = 'none';
-                tableBody.innerHTML = '<tr><td colspan="3" style="text-align:center;">该时间段内没有问题。</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center;">该时间段内没有问题。</td></tr>'; // colspan 改为 4
                 return;
             }
 
             questions.forEach(q => {
                 const row = tableBody.insertRow();
-                const localTime = new Date(q.createdAt).toLocaleString('zh-CN', { hour12: false });
+                const localTime = new Date(q.createdAt).toLocaleString('ja-JP', { hour12: false });
                 row.insertCell(0).textContent = localTime;
                 row.insertCell(1).textContent = q.name;
                 row.insertCell(2).textContent = q.text;
+                row.insertCell(3).textContent = q.ipAddress || 'N/A'; // 2. 新增单元格显示IP
             });
             exportBtn.style.display = 'inline-block';
         }
@@ -85,22 +81,22 @@
         exportBtn.addEventListener('click', () => {
             if (currentQuestions.length === 0) return;
             
-            // 在CSV内容的开头加入BOM标记 \uFEFF 来兼容Excel
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFF时间,提问人,问题内容\n";
+            // 3. 在CSV表头中增加IP地址
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF时间,提问人,问题内容,IP 地址\n";
             
             currentQuestions.forEach(q => {
-                // 将时间格式化为更适合CSV的格式，并确保数据安全
-                const time = `"${new Date(q.createdAt).toLocaleString('zh-CN', { hour12: false })}"`;
+                const time = `"${new Date(q.createdAt).toLocaleString('ja-JP', { hour12: false })}"`;
                 const name = `"${q.name}"`;
-                const text = `"${q.text.replace(/"/g, '""')}"`; // 处理问题中的双引号
+                const text = `"${q.text.replace(/"/g, '""')}"`;
+                const ip = `"${q.ipAddress || ''}"`; // 4. 在CSV数据行中增加IP地址
                 
-                csvContent += [time, name, text].join(',') + "\n";
+                csvContent += [time, name, text, ip].join(',') + "\n";
             });
 
             const encodedUri = encodeURI(csvContent);
             const link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "questions_export.csv"); // 给文件一个更具体的名字
+            link.setAttribute("download", "questions_export.csv");
             document.body.appendChild(link);
             link.click();
             link.remove();

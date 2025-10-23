@@ -117,7 +117,14 @@
             if (questionData.createdAt) {
                 // 将ISO时间字符串转为Date对象，然后格式化为本地时间（只显示时:分）
                 const date = new Date(questionData.createdAt);
-                timestamp.textContent = date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+                timestamp.textContent = date.toLocaleString('ja-JP', {
+                    year: 'numeric', // 显示年份
+                    month: '2-digit', // 显示月份 (两位数)
+                    day: '2-digit', // 显示日期 (两位数)
+                    hour: '2-digit', // 显示小时 (两位数)
+                    minute: '2-digit', // 显示分钟 (两位数)
+                    hour12: false // 使用24小时制
+                });
             }
 
             // 3. 创建作者名字

@@ -26,33 +26,39 @@
         .card-wall::-webkit-scrollbar-track { background: #2C3053; border-radius: 4px; }
         .card-wall::-webkit-scrollbar-thumb { background: #4A5073; border-radius: 4px; }
         .card-wall::-webkit-scrollbar-thumb:hover { background: #5E6591; }
-        .card { position: relative; background-color: #fff; color: #333; border-radius: 8px; padding: 20px; width: calc(33.333% - 27px); min-width: 280px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; animation: fadeIn 0.5s ease; transition: transform 0.2s ease; }
+
+        .card {
+            position: relative;
+            background-color: #fff; color: #333; border-radius: 8px; padding: 20px; width: calc(33.333% - 27px); min-width: 280px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); display: flex; flex-direction: column; animation: fadeIn 0.5s ease; transition: transform 0.2s ease;
+        }
         .card:hover { transform: translateY(-5px); }
-        .card .question-text { font-size: 20px; line-height: 1.4; word-wrap: break-word; }
-        .card .author-name { font-size: 14px; font-weight: 500; color: #555; text-align: right; margin-top: 15px; }
+        .card .question-text { font-size: 20px; line-height: 1.4; word-wrap: break-word; flex-grow: 1; }
+        /* *** 核心CSS修改 *** */
+        .card .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #555;
+        }
+        .card .timestamp {
+            color: #777;
+            font-size: 12px;
+        }
+        .card .author-name {
+            font-weight: 500;
+            text-align: right;
+        }
         .delete-btn { position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; border-radius: 50%; border: none; background-color: #e0e0e0; color: #555; font-size: 16px; line-height: 24px; text-align: center; cursor: pointer; opacity: 0; transition: opacity 0.2s ease, background-color 0.2s ease; }
         .card:hover .delete-btn { opacity: 1; }
         .delete-btn:hover { background-color: #f44336; color: white; }
         .card.deleting { transition: opacity 0.4s ease, transform 0.4s ease; opacity: 0; transform: scale(0.95); }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* --- 滑动问题修复的关键修改 --- */
-        /* 仅在桌面端 (宽度 > 600px) 时锁定body滚动 */
-        @media (min-width: 601px) {
-            body {
-                overflow: hidden;
-            }
-        }
-        
+        @media (min-width: 601px) { body { overflow: hidden; } }
         @media (max-width: 900px) { .card { width: calc(50% - 25px); } }
-        
-        @media (max-width: 600px) { 
-            body { overflow: auto; /* 在手机上允许body滚动 */ }
-            .container { flex-direction: column; height: auto; } 
-            .sidebar { width: auto; margin-bottom: 20px; } 
-            .card-wall { margin-left: 0; overflow-y: visible; /* 卡片墙不再独立滚动 */ } 
-            .card { width: 100%; min-width: unset; } 
-        }
+        @media (max-width: 600px) { body { overflow: auto; } .container { flex-direction: column; height: auto; } .sidebar { width: auto; margin-bottom: 20px; } .card-wall { margin-left: 0; overflow-y: visible; } .card { width: 100%; min-width: unset; } }
     </style>
 </head>
 <body>
@@ -74,133 +80,79 @@
         </div>
         <div id="card-wall" class="card-wall"></div>
     </div>
-    
+
     <script>
-        // --- 变量定义 ---
         const pathParts = window.location.pathname.split('/');
         const sessionCode = pathParts[pathParts.length - 1];
-
-        // --- 二维码生成 ---
         const clientUrl = `${window.location.protocol}//${window.location.host}/session/${sessionCode}/ask`;
-        try {
-            const qr = qrcode(4, 'L');
-            qr.addData(clientUrl);
-            qr.make();
-            document.getElementById('qrcode').innerHTML = qr.createImgTag(5, 5);
-        } catch (e) {
-            console.error("二维码生成失败: ", e);
-            document.getElementById('qrcode').textContent = "二维码加载失败";
-        }
-        
+        try { const qr = qrcode(4, 'L'); qr.addData(clientUrl); qr.make(); document.getElementById('qrcode').innerHTML = qr.createImgTag(5, 5); } catch (e) { console.error("二维码生成失败: ", e); document.getElementById('qrcode').textContent = "二维码加载失败"; }
         const qrImgElement = document.querySelector('#qrcode img');
-
-        // --- 复制二维码逻辑 ---
         const copyBtn = document.getElementById('copy-qr-btn');
-        copyBtn.addEventListener('click', async () => {
-            if (!navigator.clipboard || !navigator.clipboard.write) {
-                alert('您的浏览器不支持自动复制图片，请尝试下载或手动右键复制。');
-                return;
-            }
-            if (!qrImgElement) { alert('二维码图片不存在。'); return; }
-            try {
-                const dataUrl = qrImgElement.src;
-                const response = await fetch(dataUrl);
-                const blob = await response.blob();
-                await navigator.clipboard.write([ new ClipboardItem({ [blob.type]: blob }) ]);
-                const originalText = copyBtn.textContent;
-                copyBtn.textContent = '✅ 已复制！';
-                setTimeout(() => { copyBtn.textContent = originalText; }, 2000);
-            } catch (err) {
-                console.error('复制失败: ', err);
-                alert('复制二维码失败，可能是浏览器权限问题。');
-            }
-        });
-
-        // --- 下载二维码逻辑 ---
+        copyBtn.addEventListener('click', async () => { if (!navigator.clipboard || !navigator.clipboard.write) { alert('您的浏览器不支持自动复制图片，请尝试下载或手动右键复制。'); return; } if (!qrImgElement) { alert('二维码图片不存在。'); return; } try { const dataUrl = qrImgElement.src; const response = await fetch(dataUrl); const blob = await response.blob(); await navigator.clipboard.write([ new ClipboardItem({ [blob.type]: blob }) ]); const originalText = copyBtn.textContent; copyBtn.textContent = '✅ 已复制！'; setTimeout(() => { copyBtn.textContent = originalText; }, 2000); } catch (err) { console.error('复制失败: ', err); alert('复制二维码失败，可能是浏览器权限问题。'); } });
         const downloadBtn = document.getElementById('download-qr-btn');
-        downloadBtn.addEventListener('click', () => {
-            if (!qrImgElement) { alert('二维码图片不存在。'); return; }
-            const link = document.createElement('a');
-            link.href = qrImgElement.src;
-            link.download = `qrcode-session-${sessionCode}.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        });
-
-        // --- WebSocket 连接 ---
+        downloadBtn.addEventListener('click', () => { if (!qrImgElement) { alert('二维码图片不存在。'); return; } const link = document.createElement('a'); link.href = qrImgElement.src; link.download = `qrcode-session-${sessionCode}.png`; document.body.appendChild(link); link.click(); document.body.removeChild(link); });
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${wsProtocol}//${window.location.host}`;
         let ws;
-        function connectWebSocket() {
-            ws = new WebSocket(wsUrl);
-            ws.onopen = () => {
-                console.log('成功连接到WebSocket服务器');
-                ws.send(JSON.stringify({ type: 'join', room: sessionCode }));
-            };
-            ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'new_question') {
-                        createQuestionCard(data.payload);
-                    } else if (data.type === 'client_count_update') {
-                        document.getElementById('client-count').textContent = data.count;
-                    } else if (data.type === 'question_deleted') {
-                        const questionId = data.payload.questionId;
-                        const cardToRemove = document.querySelector(`.card[data-question-id="${questionId}"]`);
-                        if (cardToRemove) { removeCard(cardToRemove); }
-                    }
-                } catch (e) { console.error("解析消息失败: ", e); }
-            };
-            ws.onclose = () => {
-                console.log('WebSocket连接断开，1秒后重连...');
-                setTimeout(connectWebSocket, 1000);
-            };
-            ws.onerror = (error) => {
-                console.error('WebSocket 发生错误: ', error);
-                ws.close();
-            };
-        }
+        function connectWebSocket() { ws = new WebSocket(wsUrl); ws.onopen = () => { ws.send(JSON.stringify({ type: 'join', room: sessionCode })); }; ws.onmessage = (event) => { try { const data = JSON.parse(event.data); if (data.type === 'new_question') { createQuestionCard(data.payload); } else if (data.type === 'client_count_update') { document.getElementById('client-count').textContent = data.count; } else if (data.type === 'question_deleted') { const questionId = data.payload.questionId; const cardToRemove = document.querySelector(`.card[data-question-id="${questionId}"]`); if (cardToRemove) { removeCard(cardToRemove); } } } catch (e) { console.error("解析消息失败: ", e); } }; ws.onclose = () => { setTimeout(connectWebSocket, 1000); }; ws.onerror = (error) => { ws.close(); }; }
 
-        // --- 创建/删除卡片函数 ---
+        // --- 创建/删除卡片函数 (*** 核心修改 ***) ---
         function createQuestionCard(questionData) {
             const wall = document.getElementById('card-wall');
             const card = document.createElement('div');
             card.className = 'card';
             card.dataset.questionId = questionData._id;
+
             const questionText = document.createElement('div');
             questionText.className = 'question-text';
             questionText.textContent = questionData.text;
-            const authorName = document.createElement('div');
+
+            // 1. 创建卡片底部容器
+            const cardFooter = document.createElement('div');
+            cardFooter.className = 'card-footer';
+
+            // 2. 创建并格式化时间戳
+            const timestamp = document.createElement('span');
+            timestamp.className = 'timestamp';
+            if (questionData.createdAt) {
+                // 将ISO时间字符串转为Date对象，然后格式化为本地时间（只显示时:分）
+                const date = new Date(questionData.createdAt);
+                timestamp.textContent = date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+            }
+
+            // 3. 创建作者名字
+            const authorName = document.createElement('span');
             authorName.className = 'author-name';
             authorName.textContent = `— ${questionData.name}`;
+
+            // 4. 将时间和名字放入底部容器
+            cardFooter.appendChild(timestamp);
+            cardFooter.appendChild(authorName);
+
+            // 5. 创建删除按钮 (逻辑不变)
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-btn';
             deleteBtn.innerHTML = '&times;';
             deleteBtn.title = '删除问题';
             deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation(); 
+                e.stopPropagation();
                 const questionId = e.target.closest('.card').dataset.questionId;
                 if (confirm('您确定要从展示页移除这个问题吗？')) {
                     fetch(`/api/questions/${questionId}`, { method: 'DELETE' })
-                    .catch(error => {
-                        console.error('删除请求失败:', error);
-                        alert('删除失败，请检查网络。');
-                    });
+                    .catch(error => { console.error('删除请求失败:', error); alert('删除失败，请检查网络。'); });
                 }
             });
+
+            // 6. 组装卡片
             card.appendChild(deleteBtn);
             card.appendChild(questionText);
-            card.appendChild(authorName);
+            card.appendChild(cardFooter); // 使用新的底部容器
+
             wall.prepend(card);
         }
 
-        function removeCard(cardElement) {
-            cardElement.classList.add('deleting');
-            setTimeout(() => { cardElement.remove(); }, 400);
-        }
+        function removeCard(cardElement) { cardElement.classList.add('deleting'); setTimeout(() => { cardElement.remove(); }, 400); }
 
-        // --- 加载初始数据 ---
         async function loadInitialData() {
             try {
                 const response = await fetch(`/api/sessions/${sessionCode}`);
@@ -210,14 +162,11 @@
                 document.title = `${sessionName} - 问题墙`;
                 document.getElementById('session-title').textContent = sessionName;
                 document.getElementById('card-wall').innerHTML = '';
+                // 确保从后端获取的历史问题也包含 createdAt
                 data.questions.forEach(createQuestionCard);
-            } catch(e) {
-                console.error(e);
-                document.body.innerHTML = `<h1>错误：无法加载场次 ${sessionCode}</h1>`;
-            }
+            } catch(e) { console.error(e); document.body.innerHTML = `<h1>错误：无法加载场次 ${sessionCode}</h1>`; }
         }
 
-        // --- 启动所有功能 ---
         loadInitialData();
         connectWebSocket();
     </script>

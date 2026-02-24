@@ -2,67 +2,53 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>互动抽奖</title>
+    <title>互动气泡抽奖</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
-        body { margin: 0; background-color: #1D224D; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-        .setup-area { margin-bottom: 20px; }
+        body { margin: 0; background-color: #1D224D; color: white; font-family: sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        .header { padding: 20px; z-index: 10; text-align: center; }
         select { padding: 8px; border-radius: 5px; background: #2C3053; color: white; border: 1px solid #38C695; }
         
-        #display-wall { 
-            width: 80%; max-width: 800px; height: 320px; 
-            background: rgba(44, 48, 83, 0.8); border: 3px solid #38C695; 
-            border-radius: 20px; display: flex; flex-direction: column; 
-            align-items: center; justify-content: center; padding: 25px; 
-            box-shadow: 0 0 30px rgba(56, 198, 149, 0.3);
-            text-align: center;
-        }
-
-        #rolling-text { 
-            font-size: 2.2rem; font-weight: bold; margin-bottom: 15px; 
-            overflow-wrap: break-word; max-width: 100%; 
-            line-height: 1.3;
-            transition: color 0.3s;
-        }
-        #rolling-name { font-size: 1.5rem; color: #38C695; margin-bottom: 20px; }
-
-        .controls { margin-top: 30px; display: flex; gap: 15px; }
-        button { padding: 12px 35px; border-radius: 50px; border: none; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
-        #action-btn { background: #38C695; color: white; }
+        canvas { position: absolute; top: 0; left: 0; cursor: pointer; }
         
-        .result-actions { display: none; gap: 10px; }
-        .btn-link { background: #4A5073; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; font-size: 0.9rem; }
+        .ui-layer { position: absolute; bottom: 50px; z-index: 10; display: flex; flex-direction: column; align-items: center; }
+        button { padding: 15px 40px; font-size: 1.2rem; background: #38C695; color: white; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; }
+        
+        /* 中奖弹窗 */
+        #result-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; color: #333; padding: 40px; border-radius: 20px; width: 80%; max-width: 600px; text-align: center; z-index: 100; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+        .btn-link { background: #4A5073; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; margin: 10px; display: inline-block; }
     </style>
 </head>
 <body>
-    <div class="setup-area">
-        <h2 id="session-title">正在加载场次...</h2>
+    <div class="header">
+        <h2 id="session-title">正在加载...</h2>
         日期：<select id="date-selector"></select>
     </div>
-    <div id="display-wall">
-        <div id="rolling-text">请先选择日期并点击开始</div>
-        <div id="rolling-name">---</div>
-        <div id="result-actions" class="result-actions">
-            <a href="#" id="jump-btn" class="btn-link">🔗 展示墙定位</a>
-            <a href="/records.html" class="btn-link">📜 中奖记录</a>
-        </div>
+
+    <canvas id="ballCanvas"></canvas>
+
+    <div class="ui-layer">
+        <button id="action-btn">开始碰撞</button>
     </div>
-    <div class="controls">
-        <button id="action-btn" disabled>加载中...</button>
-        <button onclick="window.history.back()" style="background:#2C3053; color:#aaa;">返回</button>
+
+    <div id="result-modal">
+        <h1 style="color: #FFD700">🎊 恭喜这位同学！</h1>
+        <div id="lucky-text" style="font-size: 1.5rem; margin: 20px 0; line-height: 1.5;"></div>
+        <div id="lucky-name" style="color: #38C695; font-size: 1.2rem; font-weight: bold;"></div>
+        <div style="margin-top: 20px;">
+            <a href="#" id="jump-btn" class="btn-link">🔗 去展示墙</a>
+            <button onclick="location.reload()" style="background:#eee; color:#333; padding:10px 20px; border-radius:5px; border:none; cursor:pointer;">再抽一次</button>
+        </div>
     </div>
 
     <script>
+        const canvas = document.getElementById('ballCanvas');
+        const ctx = canvas.getContext('2d');
         const urlParams = new URLSearchParams(window.location.search);
         const sessionCode = urlParams.get('code');
-        const targetDate = urlParams.get('date'); // 获取从展示墙传来的日期
+        const targetDate = urlParams.get('date');
         
-        let allQuestions = [], filteredPool = [], luckyOne = null, isRolling = false, timer = null, sessionName = "";
-
-        const textEl = document.getElementById('rolling-text');
-        const nameEl = document.getElementById('rolling-name');
-        const actionBtn = document.getElementById('action-btn');
-        const selector = document.getElementById('date-selector');
+        let balls = [], allQuestions = [], filteredPool = [], isRunning = false, sessionName = "";
 
         async function init() {
             const resp = await fetch(`/api/sessions/${sessionCode}`);
@@ -72,65 +58,83 @@
             document.getElementById('session-title').textContent = sessionName;
 
             const dates = [...new Set(allQuestions.map(q => new Date(q.createdAt).toLocaleDateString('ja-JP')))].sort().reverse();
+            const selector = document.getElementById('date-selector');
             selector.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
-            
-            // 核心修改 1：如果 URL 有日期，则自动锁定该日期
-            if (targetDate && dates.includes(targetDate)) {
-                selector.value = targetDate;
-            }
+            if (targetDate && dates.includes(targetDate)) selector.value = targetDate;
 
             selector.onchange = () => {
                 filteredPool = allQuestions.filter(q => new Date(q.createdAt).toLocaleDateString('ja-JP') === selector.value);
-                textEl.textContent = `该日期共有 ${filteredPool.length} 条问题`;
-                nameEl.textContent = "---";
-                textEl.style.color = "white";
-                document.getElementById('result-actions').style.display = 'none';
+                createBalls();
             };
-            
-            selector.onchange(); 
-            actionBtn.disabled = false; 
-            actionBtn.textContent = "开始抽取";
+            selector.onchange();
+            resize();
+            animate();
         }
 
-        actionBtn.onclick = () => {
-            if (isRolling) stopRoll();
-            else startRoll();
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.onresize = resize;
+
+        class Ball {
+            constructor(q) {
+                this.q = q;
+                this.radius = 40 + Math.random() * 20;
+                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
+                this.y = Math.random() * (canvas.height - this.radius * 2) + this.radius;
+                this.dx = (Math.random() - 0.5) * 10;
+                this.dy = (Math.random() - 0.5) * 10;
+                this.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.fillStyle = "white";
+                ctx.textAlign = "center";
+                ctx.font = "12px sans-serif";
+                // 滚动中截断文字
+                const label = this.q.name.substring(0, 5);
+                ctx.fillText(label, this.x, this.y + 5);
+                ctx.closePath();
+            }
+            update() {
+                if (isRunning) {
+                    if (this.x + this.radius > canvas.width || this.x - this.radius < 0) this.dx = -this.dx;
+                    if (this.y + this.radius > canvas.height || this.y - this.radius < 0) this.dy = -this.dy;
+                    this.x += this.dx; this.y += this.dy;
+                }
+                this.draw();
+            }
+        }
+
+        function createBalls() {
+            balls = filteredPool.map(q => new Ball(q));
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            balls.forEach(ball => ball.update());
+            requestAnimationFrame(animate);
+        }
+
+        document.getElementById('action-btn').onclick = function() {
+            if (!isRunning) {
+                isRunning = true; this.textContent = "停！";
+            } else {
+                stopLottery();
+            }
         };
 
-        function startRoll() {
-            if (filteredPool.length === 0) return alert("该日期没问题！");
-            isRolling = true;
-            document.getElementById('result-actions').style.display = 'none';
-            actionBtn.textContent = "停止";
-            textEl.style.color = "white";
-
-            timer = setInterval(() => {
-                luckyOne = filteredPool[Math.floor(Math.random() * filteredPool.length)];
-                
-                // 核心修改 2：滚动过程中对长文本进行截断
-                const maxLength = 25; // 限制 25 个字符
-                let displayText = luckyOne.text;
-                if (displayText.length > maxLength) {
-                    displayText = displayText.substring(0, maxLength) + "……";
-                }
-                
-                textEl.textContent = displayText;
-                nameEl.textContent = `提问人：${luckyOne.name}`;
-            }, 60);
-        }
-
-        async function stopRoll() {
-            clearInterval(timer);
-            isRolling = false;
-            actionBtn.textContent = "再抽一次";
-            confetti({ particleCount: 150, spread: 70 });
+        async function stopLottery() {
+            isRunning = false;
+            const lucky = balls[Math.floor(Math.random() * balls.length)].q;
             
-            // 中奖时显示完整问题
-            textEl.textContent = luckyOne.text;
-            textEl.style.color = "#FFD700"; // 金色高亮
-
-            document.getElementById('jump-btn').href = `/session/${sessionCode}#q-${luckyOne._id}`;
-            document.getElementById('result-actions').style.display = 'flex';
+            confetti({ particleCount: 200, spread: 90 });
+            
+            document.getElementById('lucky-text').textContent = lucky.text;
+            document.getElementById('lucky-name').textContent = `提问人：${lucky.name}`;
+            document.getElementById('jump-btn').href = `/session/${sessionCode}#q-${lucky._id}`;
+            document.getElementById('result-modal').style.display = 'block';
 
             await fetch('/api/lottery-records', {
                 method: 'POST',
@@ -138,12 +142,13 @@
                 body: JSON.stringify({
                     sessionName: sessionName,
                     sessionCode: sessionCode,
-                    date: selector.value,
-                    questionText: luckyOne.text,
-                    userName: luckyOne.name
+                    date: document.getElementById('date-selector').value,
+                    questionText: lucky.text,
+                    userName: lucky.name
                 })
             });
         }
+
         init();
     </script>
 </body>

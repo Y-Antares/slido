@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>互动翻牌抽奖</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        body { margin: 0; background-color: #1D224D; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; overflow-x: hidden; }
+        .setup-area { margin-bottom: 20px; text-align: center; }
+        select { padding: 8px; border-radius: 5px; background: #2C3053; color: white; border: 1px solid #38C695; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px; width: 90%; max-width: 1000px; margin-top: 20px; }
+        .flip-card { background-color: transparent; width: 150px; height: 180px; perspective: 1000px; cursor: pointer; }
+        .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; box-shadow: 0 4px 8px rgba(0,0,0,0.2); border-radius: 10px; }
+        .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
+        .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 10px; box-sizing: border-box; }
+        .flip-card-front { background: linear-gradient(135deg, #2C3053 0%, #1D224D 100%); border: 2px solid #38C695; color: #38C695; font-size: 3rem; }
+        .flip-card-back { background-color: #fff; color: #333; transform: rotateY(180deg); flex-direction: column; font-size: 0.9rem; border: 2px solid #FFD700; }
+        .q-text { font-weight: bold; margin-bottom: 10px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; }
+        .q-author { color: #38C695; font-size: 0.8rem; }
+        .winner-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; background: #fff; color: #333; padding: 30px; border-radius: 20px; box-shadow: 0 0 50px rgba(0,0,0,0.5); z-index: 100; text-align: center; }
+        .btn-link { display: inline-block; margin: 10px 5px; background: #38C695; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; }
+        .btn-secondary { background: #4A5073; }
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 90; }
+    </style>
+</head>
+<body>
+    <div class="setup-area">
+        <h2 id="session-title">正在加载场次...</h2>
+        日期：<select id="date-selector"></select>
+    </div>
+    <div class="card-grid" id="card-grid"></div>
+    <div class="overlay" id="overlay"></div>
+    <div class="winner-modal" id="winner-modal">
+        <h2 style="color: #FFD700">🎉 中奖啦！</h2>
+        <div id="winner-content" style="font-size: 1.2rem; margin: 15px 0;"></div>
+        <div id="winner-name" style="color: #38C695; font-weight: bold;"></div>
+        <div style="margin-top: 20px;">
+            <a href="#" id="jump-btn" class="btn-link">🔗 展示墙定位</a>
+            <a href="/records.html" class="btn-link btn-secondary">📜 中奖记录</a>
+        </div>
+        <button onclick="closeModal()" style="margin-top: 15px; background:none; border:none; color:#777; cursor:pointer;">关闭</button>
+    </div>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionCode = urlParams.get('code');
+        const targetDate = urlParams.get('date');
+        let allQuestions = [], filteredPool = [], sessionName = "";
+        const selector = document.getElementById('date-selector');
+        const grid = document.getElementById('card-grid');
+        async function init() {
+            const resp = await fetch(`/api/sessions/${sessionCode}`);
+            const data = await resp.json();
+            allQuestions = data.questions;
+            sessionName = data.session.name;
+            document.getElementById('session-title').textContent = sessionName;
+            const dates = [...new Set(allQuestions.map(q => new Date(q.createdAt).toLocaleDateString('ja-JP')))].sort().reverse();
+            selector.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
+            if (targetDate && dates.includes(targetDate)) selector.value = targetDate;
+            selector.onchange = () => {
+                filteredPool = allQuestions.filter(q => new Date(q.createdAt).toLocaleDateString('ja-JP') === selector.value);
+                renderCards();
+            };
+            selector.onchange(); 
+        }
+        function renderCards() {
+            grid.innerHTML = filteredPool.map((q, index) => `
+                <div class="flip-card" onclick="flipCard(this, ${index})">
+                    <div class="flip-card-inner">
+                        <div class="flip-card-front">?</div>
+                        <div class="flip-card-back">
+                            <div class="q-text">${q.text}</div>
+                            <div class="q-author">提问者: ${q.name}</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        async function flipCard(element, index) {
+            if (element.classList.contains('flipped')) return;
+            element.classList.add('flipped');
+            const luckyOne = filteredPool[index];
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+            setTimeout(() => {
+                document.getElementById('winner-content').textContent = luckyOne.text;
+                document.getElementById('winner-name').textContent = `— ${luckyOne.name}`;
+                document.getElementById('jump-btn').href = `/session/${sessionCode}#q-${luckyOne._id}`;
+                document.getElementById('winner-modal').style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
+            }, 600);
+            await fetch('/api/lottery-records', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionName: sessionName, sessionCode: sessionCode,
+                    date: selector.value, questionText: luckyOne.text, userName: luckyOne.name
+                })
+            });
+        }
+        function closeModal() { document.getElementById('winner-modal').style.display = 'none'; document.getElementById('overlay').style.display = 'none'; }
+        init();
+    </script>
+</body>
+</html>

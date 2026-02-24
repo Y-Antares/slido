@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>互动气泡抽奖</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        body { margin: 0; background-color: #1D224D; color: white; font-family: sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
+        .header { padding: 20px; z-index: 10; text-align: center; }
+        select { padding: 8px; border-radius: 5px; background: #2C3053; color: white; border: 1px solid #38C695; }
+        canvas { position: absolute; top: 0; left: 0; cursor: pointer; }
+        .ui-layer { position: absolute; bottom: 50px; z-index: 10; display: flex; flex-direction: column; align-items: center; }
+        button#action-btn { padding: 15px 40px; font-size: 1.2rem; background: #38C695; color: white; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        #result-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; color: #333; padding: 40px; border-radius: 20px; width: 80%; max-width: 600px; text-align: center; z-index: 100; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+        .btn-link { background: #4A5073; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; margin: 5px; display: inline-block; font-weight: bold; }
+        .btn-accent { background: #38C695; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2 id="session-title">正在加载...</h2>
+        日期：<select id="date-selector"></select>
+    </div>
+    <canvas id="ballCanvas"></canvas>
+    <div class="ui-layer"><button id="action-btn">开始碰撞</button></div>
+    <div id="result-modal">
+        <h1 style="color: #FFD700">🎊 恭喜这位同学！</h1>
+        <div id="lucky-text" style="font-size: 1.5rem; margin: 20px 0; line-height: 1.5;"></div>
+        <div id="lucky-name" style="color: #38C695; font-size: 1.2rem; font-weight: bold;"></div>
+        <div style="margin-top: 30px;">
+            <a href="#" id="jump-btn" class="btn-link btn-accent">🔗 去展示墙</a>
+            <a href="/records.html" class="btn-link">📜 中奖记录</a>
+            <button onclick="location.reload()" style="background:#eee; color:#333; padding:10px 20px; border-radius:5px; border:none; cursor:pointer; font-weight:bold;">再抽一次</button>
+        </div>
+    </div>
+    <script>
+        const canvas = document.getElementById('ballCanvas');
+        const ctx = canvas.getContext('2d');
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionCode = urlParams.get('code');
+        const targetDate = urlParams.get('date');
+        let balls = [], allQuestions = [], filteredPool = [], isRunning = false, sessionName = "";
+        async function init() {
+            const resp = await fetch(`/api/sessions/${sessionCode}`);
+            const data = await resp.json();
+            allQuestions = data.questions;
+            sessionName = data.session.name;
+            document.getElementById('session-title').textContent = sessionName;
+            const dates = [...new Set(allQuestions.map(q => new Date(q.createdAt).toLocaleDateString('ja-JP')))].sort().reverse();
+            const selector = document.getElementById('date-selector');
+            selector.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
+            if (targetDate && dates.includes(targetDate)) selector.value = targetDate;
+            selector.onchange = () => {
+                filteredPool = allQuestions.filter(q => new Date(q.createdAt).toLocaleDateString('ja-JP') === selector.value);
+                createBalls();
+            };
+            selector.onchange(); resize(); animate();
+        }
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.onresize = resize;
+        class Ball {
+            constructor(q) {
+                this.q = q; this.radius = 45 + Math.random() * 15;
+                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
+                this.y = Math.random() * (canvas.height - this.radius * 2) + this.radius;
+                this.dx = (Math.random() - 0.5) * 12; this.dy = (Math.random() - 0.5) * 12;
+                this.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+            }
+            draw() {
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color; ctx.fill(); ctx.fillStyle = "white";
+                ctx.textAlign = "center"; ctx.font = "bold 14px sans-serif";
+                ctx.fillText(this.q.name.substring(0, 5), this.x, this.y + 5);
+                ctx.closePath();
+            }
+            update() {
+                if (isRunning) {
+                    if (this.x + this.radius > canvas.width || this.x - this.radius < 0) this.dx = -this.dx;
+                    if (this.y + this.radius > canvas.height || this.y - this.radius < 0) this.dy = -this.dy;
+                    this.x += this.dx; this.y += this.dy;
+                }
+                this.draw();
+            }
+        }
+        function createBalls() { balls = filteredPool.map(q => new Ball(q)); }
+        function animate() { ctx.clearRect(0, 0, canvas.width, canvas.height); balls.forEach(ball => ball.update()); requestAnimationFrame(animate); }
+        document.getElementById('action-btn').onclick = function() {
+            if (!isRunning) { isRunning = true; this.textContent = "停！"; this.style.background = "#ff4757"; }
+            else { stopLottery(); }
+        };
+        async function stopLottery() {
+            isRunning = false;
+            const lucky = balls[Math.floor(Math.random() * balls.length)].q;
+            confetti({ particleCount: 200, spread: 90 });
+            document.getElementById('lucky-text').textContent = lucky.text;
+            document.getElementById('lucky-name').textContent = `提问人：${lucky.name}`;
+            document.getElementById('jump-btn').href = `/session/${sessionCode}#q-${lucky._id}`;
+            document.getElementById('result-modal').style.display = 'block';
+            await fetch('/api/lottery-records', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionName: sessionName, sessionCode: sessionCode,
+                    date: document.getElementById('date-selector').value,
+                    questionText: lucky.text, userName: lucky.name
+                })
+            });
+        }
+        init();
+    </script>
+</body>
+</html>

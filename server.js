@@ -77,8 +77,12 @@ app.get('/session/:code/ask', (req, res) => {
 });
 
 // 3. 抽奖与记录页 (公开)
-app.get('/lottery.html', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'lottery.html'));
+app.get('/lottery-flip.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'lottery-flip.html'));
+});
+
+app.get('/lottery-ball.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'lottery-ball.html'));
 });
 
 app.get('/records.html', (req, res) => {

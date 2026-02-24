@@ -29,7 +29,7 @@
         }
         .sidebar h2 { margin-top: 0; color: #EFEFEF; }
         
-        /* 二维码容器与操作按钮 */
+        /* 二维码容器与操作 */
         #qrcode-container { margin-top: 20px; padding: 15px; background: white; border-radius: 8px; }
         #qrcode-container p { color: #333; margin: 5px 0 10px; font-weight: bold; }
         #qrcode img { max-width: 100%; height: auto; }
@@ -40,6 +40,31 @@
         }
         #copy-qr-btn { background-color: #4A5073; }
         #download-qr-btn { background-color: #38C695; }
+
+        /* 新增：抽奖模式选择器样式 */
+        .mode-selector {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            text-align: left;
+        }
+        .mode-selector label {
+            display: block;
+            font-size: 0.8rem;
+            color: #aaa;
+            margin-bottom: 8px;
+        }
+        .mode-selector select {
+            width: 100%;
+            padding: 8px;
+            background: #1D224D;
+            color: white;
+            border: 1px solid #38C695;
+            border-radius: 4px;
+            cursor: pointer;
+            outline: none;
+        }
 
         /* 实时在线计数器 */
         .live-counter { margin-top: auto; padding-top: 20px; border-top: 1px solid #4A5073; }
@@ -61,7 +86,7 @@
         .card-wall::-webkit-scrollbar-track { background: #2C3053; border-radius: 4px; }
         .card-wall::-webkit-scrollbar-thumb { background: #4A5073; border-radius: 4px; }
 
-        /* 问题卡片样式 */
+        /* 问题卡片 */
         .card {
             position: relative;
             background-color: #fff; 
@@ -79,7 +104,6 @@
         .card:hover { transform: translateY(-5px); }
         .card .question-text { font-size: 20px; line-height: 1.4; word-wrap: break-word; flex-grow: 1; }
         
-        /* 卡片页脚：时间与作者 */
         .card-footer {
             display: flex;
             justify-content: space-between;
@@ -91,7 +115,6 @@
         .timestamp { color: #777; font-size: 12px; }
         .author-name { font-weight: 500; text-align: right; }
 
-        /* 功能按钮：删除与抽奖 */
         .delete-btn { 
             position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; 
             border-radius: 50%; border: none; background-color: #e0e0e0; color: #555; 
@@ -110,7 +133,6 @@
         .card.deleting { opacity: 0; transform: scale(0.95); transition: all 0.4s; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* 响应式适配 */
         @media (max-width: 900px) { .card { width: calc(50% - 25px); } }
         @media (max-width: 600px) { 
             body { overflow: auto; }
@@ -129,10 +151,19 @@
                 <p>手机扫码提问</p>
                 <div id="qrcode"></div>
                 <div id="qrcode-actions">
-                    <button id="copy-qr-btn">复制图片</button>
-                    <button id="download-qr-btn">下载图片</button>
+                    <button id="copy-qr-btn">复制</button>
+                    <button id="download-qr-btn">下载</button>
                 </div>
             </div>
+
+            <div class="mode-selector">
+                <label>默认抽奖模式：</label>
+                <select id="lottery-mode-select">
+                    <option value="lottery-flip.html">🃏 翻卡片模式</option>
+                    <option value="lottery-ball.html">⚽ 物理碰撞球</option>
+                </select>
+            </div>
+
             <div class="live-counter">
                 <div id="client-count" class="live-counter-number">0</div>
                 <div class="live-counter-label">当前在线</div>
@@ -142,43 +173,48 @@
     </div>
 
     <script>
-        // 1. 获取场次代码
         const pathParts = window.location.pathname.split('/');
         const sessionCode = pathParts[pathParts.length - 1];
         const clientUrl = `${window.location.protocol}//${window.location.host}/session/${sessionCode}/ask`;
 
-        // 2. 生成二维码
+        // 初始化模式选择与记忆功能
+        const modeSelect = document.getElementById('lottery-mode-select');
+        const savedMode = localStorage.getItem('lottery_mode');
+        if (savedMode) {
+            modeSelect.value = savedMode;
+        }
+        modeSelect.onchange = (e) => {
+            localStorage.setItem('lottery_mode', e.target.value);
+        };
+
+        // 生成二维码
         try { 
             const qr = qrcode(4, 'L'); 
             qr.addData(clientUrl); 
             qr.make(); 
             document.getElementById('qrcode').innerHTML = qr.createImgTag(5, 5); 
-        } catch (e) { 
-            document.getElementById('qrcode').textContent = "二维码生成失败"; 
-        }
+        } catch (e) { document.getElementById('qrcode').textContent = "二维码错误"; }
 
-        // 3. 二维码操作：复制与下载
         const qrImgElement = document.querySelector('#qrcode img');
         document.getElementById('copy-qr-btn').onclick = async () => {
             try {
                 const response = await fetch(qrImgElement.src);
                 const blob = await response.blob();
                 await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-                alert('二维码已复制到剪贴板！');
-            } catch (err) { alert('复制失败，请手动右键复制。'); }
+                alert('已复制！');
+            } catch (err) { alert('复制失败。'); }
         };
         document.getElementById('download-qr-btn').onclick = () => {
             const link = document.createElement('a');
             link.href = qrImgElement.src;
-            link.download = `qrcode-${sessionCode}.png`;
+            link.download = `qr-${sessionCode}.png`;
             link.click();
         };
 
-        // 4. WebSocket 连接逻辑
+        // WebSocket 逻辑
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${wsProtocol}//${window.location.host}`;
         let ws;
-
         function connectWebSocket() {
             ws = new WebSocket(wsUrl);
             ws.onopen = () => ws.send(JSON.stringify({ type: 'join', room: sessionCode }));
@@ -193,18 +229,18 @@
                         const card = document.querySelector(`.card[data-question-id="${data.payload.questionId}"]`);
                         if (card) { card.classList.add('deleting'); setTimeout(() => card.remove(), 400); }
                     }
-                } catch (e) { console.error("WS解析错误", e); }
+                } catch (e) { console.error("WS错误", e); }
             };
             ws.onclose = () => setTimeout(connectWebSocket, 1000);
         }
 
-        // 5. 创建问题卡片
+        // 创建问题卡片
         function createQuestionCard(questionData) {
             const wall = document.getElementById('card-wall');
             const card = document.createElement('div');
             card.className = 'card';
             card.dataset.questionId = questionData._id;
-            card.id = `q-${questionData._id}`; // 锚点 ID 供抽奖定位使用
+            card.id = `q-${questionData._id}`;
 
             const text = document.createElement('div');
             text.className = 'question-text';
@@ -228,25 +264,22 @@
             footer.appendChild(time);
             footer.appendChild(author);
 
-            // 修改抽奖按钮点击逻辑
+            // 抽奖按钮逻辑：使用记忆的模式并携带日期参数
             const lotteryBtn = document.createElement('button');
-            lotteryBtn.innerHTML = '🎁 抽奖';
-            lotteryBtn.className = 'lottery-link-btn'; // 使用你在 CSS 中定义的类名
-            lotteryBtn.onclick = (e) => {
-                e.stopPropagation();
-                // 将该问题的创建时间转换为 YYYY/MM/DD 格式（与抽奖页日期格式一致）
+            lotteryBtn.className = 'lottery-link-btn';
+            lotteryBtn.textContent = '🎁 针对本场抽奖';
+            lotteryBtn.onclick = () => {
                 const qDate = new Date(questionData.createdAt).toLocaleDateString('ja-JP');
-                // 跳转时多带一个 date 参数
-                window.location.href = `/lottery.html?code=${sessionCode}&date=${qDate}`;
+                const selectedMode = modeSelect.value;
+                window.location.href = `/${selectedMode}?code=${sessionCode}&date=${qDate}`;
             };
 
-            // 删除按钮
             const delBtn = document.createElement('button');
             delBtn.className = 'delete-btn';
             delBtn.innerHTML = '&times;';
             delBtn.onclick = (e) => {
                 e.stopPropagation();
-                if (confirm('确定要移除此问题吗？')) {
+                if (confirm('确定移除？')) {
                     fetch(`/api/questions/${questionData._id}`, { method: 'DELETE' });
                 }
             };
@@ -258,7 +291,7 @@
             wall.prepend(card);
         }
 
-        // 6. 初始化加载
+        // 初始化数据加载与哈希定位
         async function loadInitialData() {
             try {
                 const response = await fetch(`/api/sessions/${sessionCode}`);
@@ -266,18 +299,17 @@
                 document.getElementById('session-title').textContent = data.session.name;
                 data.questions.forEach(createQuestionCard);
 
-                // 抽奖页跳转回来的定位逻辑
                 if (window.location.hash) {
                     setTimeout(() => {
                         const target = document.querySelector(window.location.hash);
                         if (target) {
                             target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            target.style.boxShadow = '0 0 25px #FFD700'; // 金色高亮
+                            target.style.boxShadow = '0 0 25px #FFD700';
                             setTimeout(() => target.style.boxShadow = '', 3000);
                         }
                     }, 500);
                 }
-            } catch(e) { console.error("初始化加载失败", e); }
+            } catch(e) { console.error("加载失败", e); }
         }
 
         loadInitialData();

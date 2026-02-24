@@ -2,163 +2,111 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>互动抽奖 - 谁是幸运儿？</title>
+    <title>互动抽奖</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
-        body {
-            margin: 0;
-            background-color: #1D224D;
-            color: white;
-            font-family: -apple-system, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
-        }
-        .lottery-container {
-            width: 85%;
-            max-width: 800px;
-            text-align: center;
-        }
-        #session-info { color: #aaa; margin-bottom: 10px; font-size: 1.1rem; }
-        
-        /* 展示大框 */
-        #display-wall {
-            height: 250px;
-            background: rgba(44, 48, 83, 0.6);
-            border: 3px solid #38C695;
-            border-radius: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 30px;
-            margin-bottom: 40px;
-            box-shadow: 0 0 40px rgba(56, 198, 149, 0.2);
-            transition: all 0.3s ease;
-        }
-        #display-wall.winner { border-color: #FFD700; box-shadow: 0 0 50px rgba(255, 215, 0, 0.4); }
-
-        #rolling-text { font-size: 2.8rem; font-weight: bold; margin-bottom: 15px; line-height: 1.2; height: 3.6rem; overflow: hidden; }
-        #rolling-name { font-size: 1.5rem; color: #38C695; min-height: 1.8rem; }
-
-        .controls { display: flex; gap: 20px; justify-content: center; }
-        button {
-            padding: 15px 40px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            border: none;
-            border-radius: 50px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        #action-btn { background: #38C695; color: white; box-shadow: 0 5px 15px rgba(56, 198, 149, 0.3); }
-        #action-btn:hover { background: #45e0a9; transform: translateY(-2px); }
-        #action-btn:active { transform: translateY(0); }
-        #action-btn:disabled { background: #555; cursor: not-allowed; box-shadow: none; }
-
-        .back-link { margin-top: 30px; color: #777; text-decoration: none; font-size: 0.9rem; border-bottom: 1px solid transparent; }
-        .back-link:hover { color: #aaa; border-bottom-color: #aaa; }
+        body { margin: 0; background-color: #1D224D; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        .setup-area { margin-bottom: 20px; }
+        select { padding: 8px; border-radius: 5px; background: #2C3053; color: white; border: 1px solid #38C695; }
+        #display-wall { width: 80%; max-width: 800px; height: 300px; background: rgba(44, 48, 83, 0.8); border: 3px solid #38C695; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-shadow: 0 0 30px rgba(56, 198, 149, 0.3); }
+        #rolling-text { font-size: 2.2rem; font-weight: bold; margin-bottom: 15px; text-align: center; overflow-wrap: break-word; max-width: 90%; }
+        #rolling-name { font-size: 1.5rem; color: #38C695; }
+        .controls { margin-top: 30px; display: flex; gap: 15px; }
+        button { padding: 12px 35px; border-radius: 50px; border: none; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
+        #action-btn { background: #38C695; color: white; }
+        .result-actions { display: none; gap: 10px; margin-top: 20px; }
+        .btn-link { background: #4A5073; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; font-size: 0.9rem; }
     </style>
 </head>
 <body>
-    <div class="lottery-container">
-        <div id="session-info">正在准备抽奖...</div>
-        <div id="display-wall">
-            <div id="rolling-text">等待开始</div>
-            <div id="rolling-name">---</div>
+    <div class="setup-area">
+        <h2 id="session-title">正在加载场次...</h2>
+        日期：<select id="date-selector"></select>
+    </div>
+    <div id="display-wall">
+        <div id="rolling-text">请先选择日期并点击开始</div>
+        <div id="rolling-name">---</div>
+        <div id="result-actions" class="result-actions">
+            <a href="#" id="jump-btn" class="btn-link">🔗 展示墙定位</a>
+            <a href="/records.html" class="btn-link">📜 中奖记录</a>
         </div>
-        <div class="controls">
-            <button id="action-btn">开始抽取</button>
-        </div>
-        <a href="#" id="back-btn" class="back-link">返回展示页</a>
+    </div>
+    <div class="controls">
+        <button id="action-btn" disabled>加载中...</button>
+        <button onclick="window.history.back()" style="background:#2C3053; color:#aaa;">返回</button>
     </div>
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const sessionCode = urlParams.get('code');
-        
-        let questionPool = [];
-        let isRolling = false;
-        let rollTimer = null;
+        let allQuestions = [], filteredPool = [], luckyOne = null, isRolling = false, timer = null, sessionName = "";
 
-        const rollingText = document.getElementById('rolling-text');
-        const rollingName = document.getElementById('rolling-name');
+        const textEl = document.getElementById('rolling-text');
+        const nameEl = document.getElementById('rolling-name');
         const actionBtn = document.getElementById('action-btn');
-        const sessionInfo = document.getElementById('session-info');
-        const displayWall = document.getElementById('display-wall');
-        const backBtn = document.getElementById('back-btn');
 
-        backBtn.href = `/session/${sessionCode}`;
+        async function init() {
+            const resp = await fetch(`/api/sessions/${sessionCode}`);
+            const data = await resp.json();
+            allQuestions = data.questions;
+            sessionName = data.session.name;
+            document.getElementById('session-title').textContent = sessionName;
 
-        // 1. 初始化：获取该场次所有问题
-        async function initLottery() {
-            if (!sessionCode) {
-                sessionInfo.textContent = "错误：未找到场次代码";
-                actionBtn.disabled = true;
-                return;
-            }
-            try {
-                const response = await fetch(`/api/sessions/${sessionCode}`);
-                const data = await response.json();
-                questionPool = data.questions;
-                sessionInfo.textContent = `场次：${data.session.name} (共 ${questionPool.length} 条提问)`;
-                
-                if (questionPool.length === 0) {
-                    rollingText.textContent = "池子里还没有问题哦";
-                    actionBtn.disabled = true;
-                }
-            } catch (err) {
-                console.error(err);
-                sessionInfo.textContent = "加载失败";
-            }
+            // 获取不重复的日期列表
+            const dates = [...new Set(allQuestions.map(q => new Date(q.createdAt).toLocaleDateString('ja-JP')))].sort().reverse();
+            const selector = document.getElementById('date-selector');
+            selector.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
+            
+            selector.onchange = () => {
+                filteredPool = allQuestions.filter(q => new Date(q.createdAt).toLocaleDateString('ja-JP') === selector.value);
+                textEl.textContent = `该日期共有 ${filteredPool.length} 条问题`;
+            };
+            selector.onchange(); 
+            actionBtn.disabled = false; actionBtn.textContent = "开始抽取";
         }
 
-        // 2. 抽奖动作切换
         actionBtn.onclick = () => {
-            if (isRolling) {
-                stopRoll();
-            } else {
-                startRoll();
-            }
+            if (isRolling) stopRoll();
+            else startRoll();
         };
 
         function startRoll() {
+            if (filteredPool.length === 0) return alert("该日期没问题！");
             isRolling = true;
-            actionBtn.textContent = "停！";
-            actionBtn.style.background = "#ff4757";
-            displayWall.classList.remove('winner');
-            rollingText.style.color = "white";
-
-            rollTimer = setInterval(() => {
-                const randomIndex = Math.floor(Math.random() * questionPool.length);
-                const pick = questionPool[randomIndex];
-                rollingText.textContent = pick.text;
-                rollingName.textContent = `提问人：${pick.name}`;
-            }, 60); // 滚动频率 60ms
+            document.getElementById('result-actions').style.display = 'none';
+            actionBtn.textContent = "停止";
+            timer = setInterval(() => {
+                luckyOne = filteredPool[Math.floor(Math.random() * filteredPool.length)];
+                textEl.textContent = luckyOne.text;
+                nameEl.textContent = `提问人：${luckyOne.name}`;
+            }, 50);
         }
 
-        function stopRoll() {
-            clearInterval(rollTimer);
+        async function stopRoll() {
+            clearInterval(timer);
             isRolling = false;
             actionBtn.textContent = "再抽一次";
-            actionBtn.style.background = "#38C695";
-            displayWall.classList.add('winner');
-            rollingText.style.color = "#FFD700";
+            confetti({ particleCount: 150, spread: 70 });
+            
+            // 显示跳转按钮
+            document.getElementById('jump-btn').href = `/session/${sessionCode}#q-${luckyOne._id}`;
+            document.getElementById('result-actions').style.display = 'flex';
+            textEl.style.color = "#FFD700";
 
-            // 触发纸屑特效
-            confetti({
-                particleCount: 150,
-                spread: 70,
-                origin: { y: 0.6 },
-                colors: ['#38C695', '#FFD700', '#ffffff']
+            // 保存记录
+            await fetch('/api/lottery-records', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionName: sessionName,
+                    sessionCode: sessionCode,
+                    date: document.getElementById('date-selector').value,
+                    questionText: luckyOne.text,
+                    userName: luckyOne.name
+                })
             });
         }
-
-        initLottery();
+        init();
     </script>
 </body>
 </html>

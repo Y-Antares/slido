@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>中奖记录查询</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f4; padding: 40px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background: #1D224D; color: white; }
+        tr:nth-child(even) { background: #fafafa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎁 互动中奖历史记录</h1>
+        <table id="record-table">
+            <thead>
+                <tr>
+                    <th>抽奖时间</th>
+                    <th>场次代码</th>
+                    <th>问题日期</th>
+                    <th>中奖人</th>
+                    <th>提问内容</th>
+                </tr>
+            </thead>
+            <tbody id="record-body"></tbody>
+        </table>
+        <br>
+        <button onclick="window.history.back()">返回上页</button>
+    </div>
+    <script>
+        async function loadRecords() {
+            const resp = await fetch('/api/lottery-records');
+            const data = await resp.json();
+            const body = document.getElementById('record-body');
+            body.innerHTML = data.map(r => `
+                <tr>
+                    <td>${new Date(r.createdAt).toLocaleString('ja-JP')}</td>
+                    <td>${r.sessionCode}</td>
+                    <td>${r.date}</td>
+                    <td>${r.userName}</td>
+                    <td>${r.questionText}</td>
+                </tr>
+            `).join('');
+        }
+        loadRecords();
+    </script>
+</body>
+</html>

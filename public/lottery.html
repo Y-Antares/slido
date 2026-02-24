@@ -8,13 +8,29 @@
         body { margin: 0; background-color: #1D224D; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
         .setup-area { margin-bottom: 20px; }
         select { padding: 8px; border-radius: 5px; background: #2C3053; color: white; border: 1px solid #38C695; }
-        #display-wall { width: 80%; max-width: 800px; height: 300px; background: rgba(44, 48, 83, 0.8); border: 3px solid #38C695; border-radius: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; box-shadow: 0 0 30px rgba(56, 198, 149, 0.3); }
-        #rolling-text { font-size: 2.2rem; font-weight: bold; margin-bottom: 15px; text-align: center; overflow-wrap: break-word; max-width: 90%; }
-        #rolling-name { font-size: 1.5rem; color: #38C695; }
+        
+        #display-wall { 
+            width: 80%; max-width: 800px; height: 320px; 
+            background: rgba(44, 48, 83, 0.8); border: 3px solid #38C695; 
+            border-radius: 20px; display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; padding: 25px; 
+            box-shadow: 0 0 30px rgba(56, 198, 149, 0.3);
+            text-align: center;
+        }
+
+        #rolling-text { 
+            font-size: 2.2rem; font-weight: bold; margin-bottom: 15px; 
+            overflow-wrap: break-word; max-width: 100%; 
+            line-height: 1.3;
+            transition: color 0.3s;
+        }
+        #rolling-name { font-size: 1.5rem; color: #38C695; margin-bottom: 20px; }
+
         .controls { margin-top: 30px; display: flex; gap: 15px; }
         button { padding: 12px 35px; border-radius: 50px; border: none; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
         #action-btn { background: #38C695; color: white; }
-        .result-actions { display: none; gap: 10px; margin-top: 20px; }
+        
+        .result-actions { display: none; gap: 10px; }
         .btn-link { background: #4A5073; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; font-size: 0.9rem; }
     </style>
 </head>
@@ -39,11 +55,14 @@
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const sessionCode = urlParams.get('code');
+        const targetDate = urlParams.get('date'); // 获取从展示墙传来的日期
+        
         let allQuestions = [], filteredPool = [], luckyOne = null, isRolling = false, timer = null, sessionName = "";
 
         const textEl = document.getElementById('rolling-text');
         const nameEl = document.getElementById('rolling-name');
         const actionBtn = document.getElementById('action-btn');
+        const selector = document.getElementById('date-selector');
 
         async function init() {
             const resp = await fetch(`/api/sessions/${sessionCode}`);
@@ -52,17 +71,25 @@
             sessionName = data.session.name;
             document.getElementById('session-title').textContent = sessionName;
 
-            // 获取不重复的日期列表
             const dates = [...new Set(allQuestions.map(q => new Date(q.createdAt).toLocaleDateString('ja-JP')))].sort().reverse();
-            const selector = document.getElementById('date-selector');
             selector.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
             
+            // 核心修改 1：如果 URL 有日期，则自动锁定该日期
+            if (targetDate && dates.includes(targetDate)) {
+                selector.value = targetDate;
+            }
+
             selector.onchange = () => {
                 filteredPool = allQuestions.filter(q => new Date(q.createdAt).toLocaleDateString('ja-JP') === selector.value);
                 textEl.textContent = `该日期共有 ${filteredPool.length} 条问题`;
+                nameEl.textContent = "---";
+                textEl.style.color = "white";
+                document.getElementById('result-actions').style.display = 'none';
             };
+            
             selector.onchange(); 
-            actionBtn.disabled = false; actionBtn.textContent = "开始抽取";
+            actionBtn.disabled = false; 
+            actionBtn.textContent = "开始抽取";
         }
 
         actionBtn.onclick = () => {
@@ -75,11 +102,21 @@
             isRolling = true;
             document.getElementById('result-actions').style.display = 'none';
             actionBtn.textContent = "停止";
+            textEl.style.color = "white";
+
             timer = setInterval(() => {
                 luckyOne = filteredPool[Math.floor(Math.random() * filteredPool.length)];
-                textEl.textContent = luckyOne.text;
+                
+                // 核心修改 2：滚动过程中对长文本进行截断
+                const maxLength = 25; // 限制 25 个字符
+                let displayText = luckyOne.text;
+                if (displayText.length > maxLength) {
+                    displayText = displayText.substring(0, maxLength) + "……";
+                }
+                
+                textEl.textContent = displayText;
                 nameEl.textContent = `提问人：${luckyOne.name}`;
-            }, 50);
+            }, 60);
         }
 
         async function stopRoll() {
@@ -88,19 +125,20 @@
             actionBtn.textContent = "再抽一次";
             confetti({ particleCount: 150, spread: 70 });
             
-            // 显示跳转按钮
+            // 中奖时显示完整问题
+            textEl.textContent = luckyOne.text;
+            textEl.style.color = "#FFD700"; // 金色高亮
+
             document.getElementById('jump-btn').href = `/session/${sessionCode}#q-${luckyOne._id}`;
             document.getElementById('result-actions').style.display = 'flex';
-            textEl.style.color = "#FFD700";
 
-            // 保存记录
             await fetch('/api/lottery-records', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     sessionName: sessionName,
                     sessionCode: sessionCode,
-                    date: document.getElementById('date-selector').value,
+                    date: selector.value,
                     questionText: luckyOne.text,
                     userName: luckyOne.name
                 })

@@ -228,11 +228,17 @@
             footer.appendChild(time);
             footer.appendChild(author);
 
-            // 抽奖入口按钮
+            // 修改抽奖按钮点击逻辑
             const lotteryBtn = document.createElement('button');
-            lotteryBtn.className = 'lottery-link-btn';
-            lotteryBtn.textContent = '🎁 针对本场抽奖';
-            lotteryBtn.onclick = () => window.location.href = `/lottery.html?code=${sessionCode}`;
+            lotteryBtn.innerHTML = '🎁 抽奖';
+            lotteryBtn.className = 'lottery-link-btn'; // 使用你在 CSS 中定义的类名
+            lotteryBtn.onclick = (e) => {
+                e.stopPropagation();
+                // 将该问题的创建时间转换为 YYYY/MM/DD 格式（与抽奖页日期格式一致）
+                const qDate = new Date(questionData.createdAt).toLocaleDateString('ja-JP');
+                // 跳转时多带一个 date 参数
+                window.location.href = `/lottery.html?code=${sessionCode}&date=${qDate}`;
+            };
 
             // 删除按钮
             const delBtn = document.createElement('button');

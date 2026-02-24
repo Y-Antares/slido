@@ -107,36 +107,38 @@
             questionText.className = 'question-text';
             questionText.textContent = questionData.text;
 
-            // 1. 创建卡片底部容器
             const cardFooter = document.createElement('div');
             cardFooter.className = 'card-footer';
 
-            // 2. 创建并格式化时间戳
             const timestamp = document.createElement('span');
             timestamp.className = 'timestamp';
             if (questionData.createdAt) {
-                // 将ISO时间字符串转为Date对象，然后格式化为本地时间（只显示时:分）
                 const date = new Date(questionData.createdAt);
                 timestamp.textContent = date.toLocaleString('ja-JP', {
-                    year: 'numeric', // 显示年份
-                    month: '2-digit', // 显示月份 (两位数)
-                    day: '2-digit', // 显示日期 (两位数)
-                    hour: '2-digit', // 显示小时 (两位数)
-                    minute: '2-digit', // 显示分钟 (两位数)
-                    hour12: false // 使用24小时制
+                    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
                 });
             }
 
-            // 3. 创建作者名字
             const authorName = document.createElement('span');
             authorName.className = 'author-name';
             authorName.textContent = `— ${questionData.name}`;
 
-            // 4. 将时间和名字放入底部容器
             cardFooter.appendChild(timestamp);
             cardFooter.appendChild(authorName);
 
-            // 5. 创建删除按钮 (逻辑不变)
+            // --- 新增：抽奖入口按钮 ---
+            const lotteryAction = document.createElement('button');
+            lotteryAction.textContent = '🎁 针对本场抽奖';
+            lotteryAction.style.cssText = 'margin-top: 10px; padding: 6px; border: 1px dashed #38C695; background: transparent; color: #38C695; border-radius: 4px; cursor: pointer; font-size: 12px; transition: all 0.2s;';
+            lotteryAction.onmouseover = () => { lotteryAction.style.background = '#38C695'; lotteryAction.style.color = '#fff'; };
+            lotteryAction.onmouseout = () => { lotteryAction.style.background = 'transparent'; lotteryAction.style.color = '#38C695'; };
+            
+            lotteryAction.onclick = (e) => {
+                e.stopPropagation();
+                // 跳转到抽奖页，通过 URL 参数传递当前场次代码
+                window.location.href = `/lottery.html?code=${sessionCode}`;
+            };
+
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-btn';
             deleteBtn.innerHTML = '&times;';
@@ -145,15 +147,14 @@
                 e.stopPropagation();
                 const questionId = e.target.closest('.card').dataset.questionId;
                 if (confirm('您确定要从展示页移除这个问题吗？')) {
-                    fetch(`/api/questions/${questionId}`, { method: 'DELETE' })
-                    .catch(error => { console.error('删除请求失败:', error); alert('删除失败，请检查网络。'); });
+                    fetch(`/api/questions/${questionId}`, { method: 'DELETE' }).catch(err => console.error(err));
                 }
             });
 
-            // 6. 组装卡片
             card.appendChild(deleteBtn);
             card.appendChild(questionText);
-            card.appendChild(cardFooter); // 使用新的底部容器
+            card.appendChild(cardFooter);
+            card.appendChild(lotteryAction); // 将抽奖按钮挂载到卡片底部
 
             wall.prepend(card);
         }

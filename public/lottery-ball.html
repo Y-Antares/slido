@@ -2,37 +2,60 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>互动气泡抽奖</title>
+    <title>互动气泡抽奖 - 严谨版</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
-        body { margin: 0; background-color: #1D224D; color: white; font-family: sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
-        .header { padding: 20px; z-index: 10; text-align: center; }
-        select { padding: 8px; border-radius: 5px; background: #2C3053; color: white; border: 1px solid #38C695; }
-        canvas { position: absolute; top: 0; left: 0; cursor: pointer; }
-        .ui-layer { position: absolute; bottom: 50px; z-index: 10; display: flex; flex-direction: column; align-items: center; }
-        button#action-btn { padding: 15px 40px; font-size: 1.2rem; background: #38C695; color: white; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
-        #result-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; color: #333; padding: 40px; border-radius: 20px; width: 80%; max-width: 600px; text-align: center; z-index: 100; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
-        .btn-link { background: #4A5073; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; margin: 5px; display: inline-block; font-weight: bold; }
-        .btn-accent { background: #38C695; }
+        body { margin: 0; background-color: #1D224D; color: white; font-family: sans-serif; overflow: hidden; }
+        
+        /* 悬浮侧边栏 */
+        .floating-sidebar { 
+            position: absolute; left: 20px; top: 100px; bottom: 100px; width: 200px; 
+            background: rgba(44, 48, 83, 0.6); backdrop-filter: blur(5px);
+            border: 1px solid rgba(56, 198, 149, 0.3); border-radius: 15px; 
+            padding: 15px; z-index: 20; display: flex; flex-direction: column;
+        }
+        .sidebar-header { color: #38C695; font-size: 0.9rem; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 10px; }
+        .p-list { flex-grow: 1; overflow-y: auto; font-size: 0.85rem; color: #eee; margin: 0; padding: 0; list-style: none; }
+        .p-list li { margin-bottom: 6px; opacity: 0.8; }
+
+        canvas { position: absolute; top: 0; left: 0; z-index: 5; }
+        .header { position: relative; padding: 20px; z-index: 10; text-align: center; pointer-events: none; }
+        .header * { pointer-events: auto; }
+        select { padding: 6px; border-radius: 5px; background: #2C3053; color: white; border: 1px solid #38C695; }
+        
+        .ui-layer { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); z-index: 10; }
+        button#action-btn { padding: 12px 40px; font-size: 1.1rem; background: #38C695; color: white; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+        
+        #result-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; color: #333; padding: 30px; border-radius: 20px; width: 500px; text-align: center; z-index: 100; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+        .btn-link { background: #4A5073; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; margin: 5px; display: inline-block; font-size: 0.9rem; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h2 id="session-title">正在加载...</h2>
+        <h2 id="session-title">加载中...</h2>
         日期：<select id="date-selector"></select>
     </div>
+
+    <div class="floating-sidebar">
+        <div class="sidebar-header" id="sidebar-header">有效抽奖 (0)</div>
+        <ul id="p-list" class="p-list"></ul>
+    </div>
+
     <canvas id="ballCanvas"></canvas>
+
     <div class="ui-layer"><button id="action-btn">开始碰撞</button></div>
+
     <div id="result-modal">
-        <h1 style="color: #FFD700">🎊 恭喜这位同学！</h1>
-        <div id="lucky-text" style="font-size: 1.5rem; margin: 20px 0; line-height: 1.5;"></div>
-        <div id="lucky-name" style="color: #38C695; font-size: 1.2rem; font-weight: bold;"></div>
-        <div style="margin-top: 30px;">
-            <a href="#" id="jump-btn" class="btn-link btn-accent">🔗 去展示墙</a>
-            <a href="/records.html" class="btn-link">📜 中奖记录</a>
-            <button onclick="location.reload()" style="background:#eee; color:#333; padding:10px 20px; border-radius:5px; border:none; cursor:pointer; font-weight:bold;">再抽一次</button>
+        <h2 style="color: #FFD700">🎉 抽中啦！</h2>
+        <div id="lucky-text" style="font-size: 1.3rem; margin: 20px 0;"></div>
+        <div id="lucky-name" style="color: #38C695; font-weight: bold;"></div>
+        <div style="margin-top: 25px;">
+            <a href="#" id="jump-btn" class="btn-link" style="background:#38C695;">🔗 展示墙定位</a>
+            <a href="/records.html" class="btn-link">📜 查看记录</a>
+            <button onclick="location.reload()" style="padding:10px 20px; border:none; cursor:pointer; border-radius:5px;">再抽一次</button>
         </div>
     </div>
+
     <script>
         const canvas = document.getElementById('ballCanvas');
         const ctx = canvas.getContext('2d');
@@ -40,37 +63,73 @@
         const sessionCode = urlParams.get('code');
         const targetDate = urlParams.get('date');
         let balls = [], allQuestions = [], filteredPool = [], isRunning = false, sessionName = "";
+
+        function calculateDifference(s1, s2) {
+            const len1 = s1.length, len2 = s2.length;
+            const matrix = Array.from({ length: len1 + 1 }, () => []);
+            for (let i = 0; i <= len1; i++) matrix[i][0] = i;
+            for (let j = 0; j <= len2; j++) matrix[0][j] = j;
+            for (let i = 1; i <= len1; i++) {
+                for (let j = 1; j <= len2; j++) {
+                    const cost = s1[i-1] === s2[j-1] ? 0 : 1;
+                    matrix[i][j] = Math.min(matrix[i-1][j]+1, matrix[i][j-1]+1, matrix[i-1][j-1]+cost);
+                }
+            }
+            return Math.max(len1, len2) === 0 ? 0 : matrix[len1][len2] / Math.max(len1, len2);
+        }
+
         async function init() {
             const resp = await fetch(`/api/sessions/${sessionCode}`);
             const data = await resp.json();
             allQuestions = data.questions;
             sessionName = data.session.name;
             document.getElementById('session-title').textContent = sessionName;
+
             const dates = [...new Set(allQuestions.map(q => new Date(q.createdAt).toLocaleDateString('ja-JP')))].sort().reverse();
             const selector = document.getElementById('date-selector');
             selector.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
             if (targetDate && dates.includes(targetDate)) selector.value = targetDate;
+
             selector.onchange = () => {
-                filteredPool = allQuestions.filter(q => new Date(q.createdAt).toLocaleDateString('ja-JP') === selector.value);
-                createBalls();
+                const raw = allQuestions.filter(q => new Date(q.createdAt).toLocaleDateString('ja-JP') === selector.value);
+                processPool(raw);
             };
             selector.onchange(); resize(); animate();
         }
+
+        function processPool(raw) {
+            const grouped = {};
+            raw.forEach(q => {
+                if (!grouped[q.name]) grouped[q.name] = [];
+                if (!grouped[q.name].some(ext => calculateDifference(ext.text, q.text) <= 0.25)) {
+                    grouped[q.name].push(q);
+                }
+            });
+
+            filteredPool = Object.values(grouped).flat();
+            document.getElementById('sidebar-header').textContent = `有效抽奖 (${filteredPool.length})`;
+            document.getElementById('p-list').innerHTML = Object.entries(grouped)
+                .map(([name, qs]) => `<li>${name} (${qs.length})</li>`).join('');
+            
+            balls = filteredPool.map(q => new Ball(q));
+        }
+
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
         window.onresize = resize;
+
         class Ball {
             constructor(q) {
-                this.q = q; this.radius = 45 + Math.random() * 15;
-                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
-                this.y = Math.random() * (canvas.height - this.radius * 2) + this.radius;
-                this.dx = (Math.random() - 0.5) * 12; this.dy = (Math.random() - 0.5) * 12;
-                this.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+                this.q = q; this.radius = 40 + Math.random() * 20;
+                this.x = Math.random() * (canvas.width - 100) + 50;
+                this.y = Math.random() * (canvas.height - 100) + 50;
+                this.dx = (Math.random() - 0.5) * 10; this.dy = (Math.random() - 0.5) * 10;
+                this.color = `hsl(${Math.random() * 360}, 60%, 65%)`;
             }
             draw() {
                 ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.color; ctx.fill(); ctx.fillStyle = "white";
-                ctx.textAlign = "center"; ctx.font = "bold 14px sans-serif";
-                ctx.fillText(this.q.name.substring(0, 5), this.x, this.y + 5);
+                ctx.textAlign = "center"; ctx.font = "12px sans-serif";
+                ctx.fillText(this.q.name.substring(0,6), this.x, this.y + 5);
                 ctx.closePath();
             }
             update() {
@@ -82,12 +141,14 @@
                 this.draw();
             }
         }
-        function createBalls() { balls = filteredPool.map(q => new Ball(q)); }
-        function animate() { ctx.clearRect(0, 0, canvas.width, canvas.height); balls.forEach(ball => ball.update()); requestAnimationFrame(animate); }
+
+        function animate() { ctx.clearRect(0, 0, canvas.width, canvas.height); balls.forEach(b => b.update()); requestAnimationFrame(animate); }
+
         document.getElementById('action-btn').onclick = function() {
             if (!isRunning) { isRunning = true; this.textContent = "停！"; this.style.background = "#ff4757"; }
             else { stopLottery(); }
         };
+
         async function stopLottery() {
             isRunning = false;
             const lucky = balls[Math.floor(Math.random() * balls.length)].q;
@@ -99,8 +160,7 @@
             await fetch('/api/lottery-records', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sessionName: sessionName, sessionCode: sessionCode,
-                    date: document.getElementById('date-selector').value,
+                    sessionName, sessionCode, date: document.getElementById('date-selector').value,
                     questionText: lucky.text, userName: lucky.name
                 })
             });

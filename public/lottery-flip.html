@@ -2,100 +2,161 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>互动翻牌抽奖</title>
+    <title>互动翻牌抽奖 - 严谨版</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
-        body { margin: 0; background-color: #1D224D; color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; padding: 20px; overflow-x: hidden; }
+        body { margin: 0; background-color: #1D224D; color: white; font-family: sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* 侧边栏样式 */
+        .stats-sidebar { width: 220px; background: rgba(44, 48, 83, 0.8); border-right: 1px solid #38C695; padding: 20px; display: flex; flex-direction: column; }
+        .stats-sidebar h3 { font-size: 1rem; color: #38C695; margin-bottom: 15px; border-bottom: 1px solid #4A5073; padding-bottom: 10px; }
+        .participant-list { flex-grow: 1; overflow-y: auto; list-style: none; padding: 0; margin: 0; font-size: 0.9rem; color: #ccc; }
+        .participant-list li { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+        /* 主内容区 */
+        .main-content { flex-grow: 1; display: flex; flex-direction: column; align-items: center; padding: 20px; overflow-y: auto; }
         .setup-area { margin-bottom: 20px; text-align: center; }
         select { padding: 8px; border-radius: 5px; background: #2C3053; color: white; border: 1px solid #38C695; }
-        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px; width: 90%; max-width: 1000px; margin-top: 20px; }
-        .flip-card { background-color: transparent; width: 150px; height: 180px; perspective: 1000px; cursor: pointer; }
-        .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; box-shadow: 0 4px 8px rgba(0,0,0,0.2); border-radius: 10px; }
+        
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px; width: 100%; margin-top: 20px; }
+        .flip-card { width: 140px; height: 170px; perspective: 1000px; cursor: pointer; }
+        .flip-card-inner { position: relative; width: 100%; height: 100%; text-align: center; transition: transform 0.6s; transform-style: preserve-3d; border-radius: 10px; }
         .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
-        .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 10px; box-sizing: border-box; }
-        .flip-card-front { background: linear-gradient(135deg, #2C3053 0%, #1D224D 100%); border: 2px solid #38C695; color: #38C695; font-size: 3rem; }
-        .flip-card-back { background-color: #fff; color: #333; transform: rotateY(180deg); flex-direction: column; font-size: 0.9rem; border: 2px solid #FFD700; }
-        .q-text { font-weight: bold; margin-bottom: 10px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; }
-        .q-author { color: #38C695; font-size: 0.8rem; }
+        .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 10px; box-sizing: border-box; }
+        .flip-card-front { background: #2C3053; border: 2px solid #38C695; color: #38C695; font-size: 2.5rem; }
+        .flip-card-back { background-color: #fff; color: #333; transform: rotateY(180deg); flex-direction: column; font-size: 0.85rem; border: 2px solid #FFD700; }
+        
+        /* 弹窗样式 */
         .winner-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 400px; background: #fff; color: #333; padding: 30px; border-radius: 20px; box-shadow: 0 0 50px rgba(0,0,0,0.5); z-index: 100; text-align: center; }
         .btn-link { display: inline-block; margin: 10px 5px; background: #38C695; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; }
-        .btn-secondary { background: #4A5073; }
         .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 90; }
     </style>
 </head>
 <body>
-    <div class="setup-area">
-        <h2 id="session-title">正在加载场次...</h2>
-        日期：<select id="date-selector"></select>
+    <div class="stats-sidebar">
+        <h3 id="sidebar-title">有效参与者 (0)</h3>
+        <ul id="participant-list" class="participant-list"></ul>
     </div>
-    <div class="card-grid" id="card-grid"></div>
+
+    <div class="main-content">
+        <div class="setup-area">
+            <h2 id="session-title">正在加载...</h2>
+            日期：<select id="date-selector"></select>
+        </div>
+        <div class="card-grid" id="card-grid"></div>
+        <button onclick="window.history.back()" style="margin-top:20px; background:none; border:1px solid #4A5073; color:#aaa; cursor:pointer; padding:10px 20px; border-radius:50px;">返回展示页</button>
+    </div>
+
     <div class="overlay" id="overlay"></div>
     <div class="winner-modal" id="winner-modal">
-        <h2 style="color: #FFD700">🎉 中奖啦！</h2>
-        <div id="winner-content" style="font-size: 1.2rem; margin: 15px 0;"></div>
+        <h2 style="color: #FFD700">🎉 恭喜中奖！</h2>
+        <div id="winner-content" style="margin: 15px 0;"></div>
         <div id="winner-name" style="color: #38C695; font-weight: bold;"></div>
         <div style="margin-top: 20px;">
-            <a href="#" id="jump-btn" class="btn-link">🔗 展示墙定位</a>
-            <a href="/records.html" class="btn-link btn-secondary">📜 中奖记录</a>
+            <a href="#" id="jump-btn" class="btn-link">🔗 定位问题</a>
+            <a href="/records.html" class="btn-link" style="background:#4A5073;">📜 记录</a>
         </div>
-        <button onclick="closeModal()" style="margin-top: 15px; background:none; border:none; color:#777; cursor:pointer;">关闭</button>
+        <button onclick="closeModal()" style="margin-top:10px; border:none; background:none; color:#888; cursor:pointer;">关闭</button>
     </div>
+
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const sessionCode = urlParams.get('code');
         const targetDate = urlParams.get('date');
         let allQuestions = [], filteredPool = [], sessionName = "";
-        const selector = document.getElementById('date-selector');
-        const grid = document.getElementById('card-grid');
+
+        // 相似度算法
+        function calculateDifference(s1, s2) {
+            const len1 = s1.length, len2 = s2.length;
+            const matrix = Array.from({ length: len1 + 1 }, () => []);
+            for (let i = 0; i <= len1; i++) matrix[i][0] = i;
+            for (let j = 0; j <= len2; j++) matrix[0][j] = j;
+            for (let i = 1; i <= len1; i++) {
+                for (let j = 1; j <= len2; j++) {
+                    const cost = s1[i-1] === s2[j-1] ? 0 : 1;
+                    matrix[i][j] = Math.min(matrix[i-1][j]+1, matrix[i][j-1]+1, matrix[i-1][j-1]+cost);
+                }
+            }
+            return Math.max(len1, len2) === 0 ? 0 : matrix[len1][len2] / Math.max(len1, len2);
+        }
+
         async function init() {
             const resp = await fetch(`/api/sessions/${sessionCode}`);
             const data = await resp.json();
             allQuestions = data.questions;
             sessionName = data.session.name;
             document.getElementById('session-title').textContent = sessionName;
+
             const dates = [...new Set(allQuestions.map(q => new Date(q.createdAt).toLocaleDateString('ja-JP')))].sort().reverse();
+            const selector = document.getElementById('date-selector');
             selector.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
             if (targetDate && dates.includes(targetDate)) selector.value = targetDate;
+
             selector.onchange = () => {
-                filteredPool = allQuestions.filter(q => new Date(q.createdAt).toLocaleDateString('ja-JP') === selector.value);
-                renderCards();
+                const raw = allQuestions.filter(q => new Date(q.createdAt).toLocaleDateString('ja-JP') === selector.value);
+                processPool(raw);
             };
             selector.onchange(); 
         }
+
+        function processPool(raw) {
+            const grouped = {};
+            raw.forEach(q => {
+                if (!grouped[q.name]) grouped[q.name] = [];
+                // 差异度 > 25% 才视为新问题
+                if (!grouped[q.name].some(ext => calculateDifference(ext.text, q.text) <= 0.25)) {
+                    grouped[q.name].push(q);
+                }
+            });
+
+            filteredPool = Object.values(grouped).flat();
+            
+            // 更新侧边栏反馈
+            document.getElementById('sidebar-title').textContent = `有效参与者 (${Object.keys(grouped).length})`;
+            document.getElementById('participant-list').innerHTML = Object.entries(grouped)
+                .map(([name, qs]) => `<li>${name} (${qs.length})</li>`).join('');
+
+            renderCards();
+        }
+
         function renderCards() {
-            grid.innerHTML = filteredPool.map((q, index) => `
+            document.getElementById('card-grid').innerHTML = filteredPool.map((q, index) => `
                 <div class="flip-card" onclick="flipCard(this, ${index})">
                     <div class="flip-card-inner">
                         <div class="flip-card-front">?</div>
                         <div class="flip-card-back">
-                            <div class="q-text">${q.text}</div>
-                            <div class="q-author">提问者: ${q.name}</div>
+                            <div style="font-weight:bold; margin-bottom:5px;">${q.text.substring(0,20)}...</div>
+                            <div style="color:#38C695;">${q.name}</div>
                         </div>
                     </div>
                 </div>
             `).join('');
         }
-        async function flipCard(element, index) {
-            if (element.classList.contains('flipped')) return;
-            element.classList.add('flipped');
-            const luckyOne = filteredPool[index];
-            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+
+        async function flipCard(el, idx) {
+            if (el.classList.contains('flipped')) return;
+            el.classList.add('flipped');
+            const lucky = filteredPool[idx];
+            confetti({ particleCount: 100, spread: 70 });
+
             setTimeout(() => {
-                document.getElementById('winner-content').textContent = luckyOne.text;
-                document.getElementById('winner-name').textContent = `— ${luckyOne.name}`;
-                document.getElementById('jump-btn').href = `/session/${sessionCode}#q-${luckyOne._id}`;
+                document.getElementById('winner-content').textContent = lucky.text;
+                document.getElementById('winner-name').textContent = `— ${lucky.name}`;
+                document.getElementById('jump-btn').href = `/session/${sessionCode}#q-${lucky._id}`;
                 document.getElementById('winner-modal').style.display = 'block';
                 document.getElementById('overlay').style.display = 'block';
             }, 600);
+
             await fetch('/api/lottery-records', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    sessionName: sessionName, sessionCode: sessionCode,
-                    date: selector.value, questionText: luckyOne.text, userName: luckyOne.name
+                    sessionName, sessionCode, date: document.getElementById('date-selector').value,
+                    questionText: lucky.text, userName: lucky.name
                 })
             });
         }
+
         function closeModal() { document.getElementById('winner-modal').style.display = 'none'; document.getElementById('overlay').style.display = 'none'; }
         init();
     </script>

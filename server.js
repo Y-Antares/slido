@@ -103,6 +103,11 @@ app.get('/records.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'records.html'));
 });
 
+// 4. 提问成功页
+app.get('/session/:code/success', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'success.html'));
+});
+
 // 托管其他静态资源
 app.use(express.static(path.join(__dirname, 'public')));
 

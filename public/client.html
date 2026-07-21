@@ -130,9 +130,7 @@
                 });
 
                 if (response.ok) {
-                    questionInput.value = '';
-                    messageEl.textContent = '✅ 提交成功！';
-                    setTimeout(() => messageEl.textContent = '', 2000);
+                    window.location.href = `/session/${sessionCode}/success`;
                 } else {
                     const errorData = await response.json();
                     throw new Error(errorData.message || '提交失败');

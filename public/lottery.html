@@ -5,18 +5,68 @@
     <title>互动气泡抽奖</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
-        body { margin: 0; background-color: #1D224D; color: white; font-family: sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; }
-        .header { padding: 20px; z-index: 10; text-align: center; }
-        select { padding: 8px; border-radius: 5px; background: #2C3053; color: white; border: 1px solid #38C695; }
-        
+        :root {
+            --bg: #F5F7FA;
+            --text: #1A2332;
+            --text-secondary: #6F7B8C;
+            --accent: #4A90D9;
+            --border: #E4E8EE;
+            --radius: 10px;
+            --font: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            margin: 0; background-color: var(--bg); color: var(--text);
+            font-family: var(--font); overflow: hidden;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .header {
+            padding: 18px; z-index: 10; text-align: center;
+            background: #FFFFFF; width: 100%;
+            border-bottom: 1px solid var(--border);
+        }
+        .header h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+        select {
+            padding: 7px 12px; border-radius: 8px; background: #FFFFFF;
+            color: var(--text); border: 1px solid var(--border); font-family: var(--font);
+            font-size: 0.88rem;
+        }
+        select:focus { border-color: var(--accent); outline: none; }
         canvas { position: absolute; top: 0; left: 0; cursor: pointer; }
-        
-        .ui-layer { position: absolute; bottom: 50px; z-index: 10; display: flex; flex-direction: column; align-items: center; }
-        button { padding: 15px 40px; font-size: 1.2rem; background: #38C695; color: white; border: none; border-radius: 50px; cursor: pointer; font-weight: bold; }
-        
-        /* 中奖弹窗 */
-        #result-modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; color: #333; padding: 40px; border-radius: 20px; width: 80%; max-width: 600px; text-align: center; z-index: 100; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
-        .btn-link { background: #4A5073; color: white; text-decoration: none; padding: 10px 20px; border-radius: 5px; margin: 10px; display: inline-block; }
+        .ui-layer {
+            position: absolute; bottom: 40px; z-index: 10;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        button#action-btn {
+            padding: 14px 36px; font-size: 1.1rem; font-weight: 700;
+            background: var(--accent); color: white; border: none;
+            border-radius: 50px; cursor: pointer; font-family: var(--font);
+            box-shadow: 0 4px 16px rgba(74,144,217,0.3);
+            transition: all 0.15s;
+        }
+        button#action-btn:hover { background: #3A7BC8; }
+        #result-modal {
+            display: none; position: fixed; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); background: #FFFFFF; color: var(--text);
+            padding: 36px; border-radius: 16px; width: 88%; max-width: 560px;
+            text-align: center; z-index: 100; border: 1px solid var(--border);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.12);
+        }
+        #result-modal h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 16px; }
+        .btn-link {
+            background: var(--accent); color: white; text-decoration: none;
+            padding: 10px 20px; border-radius: 8px; margin: 8px;
+            display: inline-block; font-weight: 600; font-size: 0.9rem;
+            transition: all 0.15s;
+        }
+        .btn-link:hover { background: #3A7BC8; }
+        .btn-secondary {
+            background: var(--bg); color: var(--text); border: 1px solid var(--border);
+            padding: 10px 20px; border-radius: 8px; margin: 8px;
+            display: inline-block; font-weight: 600; font-size: 0.9rem;
+            text-decoration: none; cursor: pointer; transition: all 0.15s;
+        }
+        .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
     </style>
 </head>
 <body>
@@ -32,12 +82,12 @@
     </div>
 
     <div id="result-modal">
-        <h1 style="color: #FFD700">🎊 恭喜这位同学！</h1>
-        <div id="lucky-text" style="font-size: 1.5rem; margin: 20px 0; line-height: 1.5;"></div>
-        <div id="lucky-name" style="color: #38C695; font-size: 1.2rem; font-weight: bold;"></div>
+        <h1 style="color: #4A90D9;">恭喜这位同学！</h1>
+        <div id="lucky-text" style="font-size: 1.4rem; margin: 20px 0; line-height: 1.5;"></div>
+        <div id="lucky-name" style="color: #4A90D9; font-size: 1.1rem; font-weight: bold;"></div>
         <div style="margin-top: 20px;">
-            <a href="#" id="jump-btn" class="btn-link">🔗 去展示墙</a>
-            <button onclick="location.reload()" style="background:#eee; color:#333; padding:10px 20px; border-radius:5px; border:none; cursor:pointer;">再抽一次</button>
+            <a href="#" id="jump-btn" class="btn-link">去展示墙</a>
+            <button onclick="location.reload()" class="btn-secondary">再抽一次</button>
         </div>
     </div>
 
@@ -47,7 +97,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const sessionCode = urlParams.get('code');
         const targetDate = urlParams.get('date');
-        
+
         let balls = [], allQuestions = [], filteredPool = [], isRunning = false, sessionName = "";
 
         async function init() {
@@ -82,17 +132,16 @@
                 this.y = Math.random() * (canvas.height - this.radius * 2) + this.radius;
                 this.dx = (Math.random() - 0.5) * 10;
                 this.dy = (Math.random() - 0.5) * 10;
-                this.color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+                this.color = `hsl(${Math.random() * 60 + 200}, 55%, 60%)`;
             }
             draw() {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
                 ctx.fillStyle = this.color;
                 ctx.fill();
-                ctx.fillStyle = "white";
+                ctx.fillStyle = "#FFFFFF";
                 ctx.textAlign = "center";
-                ctx.font = "12px sans-serif";
-                // 滚动中截断文字
+                ctx.font = "600 12px system-ui, sans-serif";
                 const label = this.q.name.substring(0, 5);
                 ctx.fillText(label, this.x, this.y + 5);
                 ctx.closePath();
@@ -128,9 +177,9 @@
         async function stopLottery() {
             isRunning = false;
             const lucky = balls[Math.floor(Math.random() * balls.length)].q;
-            
-            confetti({ particleCount: 200, spread: 90 });
-            
+
+            confetti({ particleCount: 200, spread: 90, colors: ['#4A90D9', '#63A9E8', '#FFFFFF'] });
+
             document.getElementById('lucky-text').textContent = lucky.text;
             document.getElementById('lucky-name').textContent = `提问人：${lucky.name}`;
             document.getElementById('jump-btn').href = `/session/${sessionCode}#q-${lucky._id}`;

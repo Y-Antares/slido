@@ -5,17 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>提交成功</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f4f4f4; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .container { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 90%; max-width: 400px; text-align: center; }
-        h1 { color: #28a745; margin-top: 0; font-size: 24px; }
-        p { color: #666; font-size: 16px; margin-bottom: 30px; }
-        .btn { display: inline-block; width: 100%; padding: 15px; border: none; background-color: #007bff; color: white; font-size: 18px; border-radius: 5px; cursor: pointer; text-decoration: none; box-sizing: border-box; transition: background-color 0.2s; }
-        .btn:hover { background-color: #0056b3; }
+        :root {
+            --bg: #F5F7FA;
+            --accent: #4A90D9;
+            --accent-hover: #3A7BC8;
+            --text: #1A2332;
+            --text-secondary: #6F7B8C;
+            --font: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font);
+            background-color: var(--bg);
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background: #FFFFFF; padding: 40px; border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+            border: 1px solid #E4E8EE;
+            width: 90%; max-width: 400px; text-align: center;
+        }
+        .check-icon {
+            width: 56px; height: 56px; background: #EBF5FF;
+            border-radius: 50%; display: flex; align-items: center;
+            justify-content: center; margin: 0 auto 18px;
+            color: var(--accent); font-size: 1.6rem; font-weight: 700;
+        }
+        h1 { color: var(--text); margin: 0 0 8px; font-size: 1.3rem; font-weight: 700; }
+        p { color: var(--text-secondary); font-size: 0.92rem; margin-bottom: 28px; }
+        .btn {
+            display: inline-block; width: 100%; padding: 14px; border: none;
+            background-color: var(--accent); color: white; font-size: 1rem;
+            font-weight: 600; border-radius: 10px; cursor: pointer;
+            text-decoration: none; transition: background-color 0.15s;
+            font-family: var(--font);
+        }
+        .btn:hover { background-color: var(--accent-hover); }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>✅ 提交成功！</h1>
+        <div class="check-icon">\u2713</div>
+        <h1>提交成功</h1>
         <p>你的问题已经成功发送到大屏幕展示墙</p>
         <a href="#" id="back-btn" class="btn">继续提问</a>
     </div>

@@ -6,157 +6,144 @@
     <title>提问互动</title>
     <style>
         :root {
-            --bg-color: #13102C;
-            --card-bg: rgba(255, 255, 255, 0.07);
-            --border-color: rgba(255, 255, 255, 0.12);
-            --accent-color: #00C49F;
-            --accent-hover: #00b08f;
-            --text-main: #FFFFFF;
-            --text-secondary: #A09EC0;
+            --bg: #F5F7FA;
+            --card-bg: #FFFFFF;
+            --border: #E4E8EE;
+            --accent: #4A90D9;
+            --accent-hover: #3A7BC8;
+            --text: #1A2332;
+            --text-secondary: #6F7B8C;
+            --font: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
         }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
+            font-family: var(--font);
+            background-color: var(--bg);
+            color: var(--text);
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            margin: 0;
             padding: 20px;
-            box-sizing: border-box;
         }
-
         .form-container {
             background: var(--card-bg);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--border-color);
+            border: 1px solid var(--border);
             padding: 32px 24px;
-            border-radius: 24px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
             width: 100%;
             max-width: 440px;
-            box-sizing: border-box;
         }
-
         h1 {
             text-align: center;
-            margin-top: 0;
-            margin-bottom: 24px;
-            font-size: 1.6rem;
+            margin: 0 0 6px;
+            font-size: 1.5rem;
             font-weight: 700;
             letter-spacing: -0.5px;
+            color: var(--text);
         }
-
-        .input-group {
-            margin-bottom: 18px;
-        }
-
-        input[type="text"] {
-            width: 100%;
-            padding: 14px 18px;
-            border-radius: 14px;
-            border: 1px solid var(--border-color);
-            background: rgba(0, 0, 0, 0.2);
-            color: var(--text-main);
-            font-size: 1rem;
-            box-sizing: border-box;
-            outline: none;
-            transition: all 0.3s ease;
-        }
-
-        input[type="text"]:focus {
-            border-color: var(--accent-color);
-            box-shadow: 0 0 0 4px rgba(0, 196, 159, 0.15);
-        }
-
-        input::placeholder { color: var(--text-secondary); }
-
-        .textarea-container {
-            position: relative;
+        .subtitle {
+            text-align: center;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
             margin-bottom: 24px;
         }
-
+        .input-group { margin-bottom: 14px; }
+        input[type="text"] {
+            width: 100%;
+            padding: 13px 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.95rem;
+            outline: none;
+            transition: all 0.2s ease;
+            font-family: var(--font);
+        }
+        input[type="text"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.12);
+        }
+        input::placeholder { color: var(--text-secondary); }
+        .textarea-container { position: relative; margin-bottom: 20px; }
         textarea {
             width: 100%;
             height: 140px;
-            padding: 16px;
-            padding-bottom: 50px;
-            border-radius: 16px;
-            border: 1px solid var(--border-color);
-            background: rgba(0, 0, 0, 0.2);
-            color: var(--text-main);
-            font-size: 1rem;
-            box-sizing: border-box;
+            padding: 14px;
+            padding-bottom: 48px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.95rem;
             resize: none;
             outline: none;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
+            font-family: var(--font);
         }
-
         textarea:focus {
-            border-color: var(--accent-color);
-            box-shadow: 0 0 0 4px rgba(0, 196, 159, 0.15);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.12);
         }
-
         textarea::placeholder { color: var(--text-secondary); }
 
         .mic-btn {
             position: absolute;
-            right: 12px;
-            bottom: 12px;
-            border: none;
-            background-color: rgba(255, 255, 255, 0.1);
-            color: var(--text-main);
+            right: 10px; bottom: 10px;
+            border: 1px solid var(--border);
+            background-color: #FFFFFF;
+            color: var(--text-secondary);
             border-radius: 20px;
-            padding: 8px 14px;
-            font-size: 0.85rem;
+            padding: 7px 14px;
+            font-size: 0.82rem;
             cursor: pointer;
             display: flex;
             align-items: center;
             gap: 6px;
             transition: all 0.2s;
+            font-family: var(--font);
         }
-
-        .mic-btn:hover { background-color: rgba(255, 255, 255, 0.2); }
-        .mic-btn.recording { background-color: #ff4757; color: white; animation: pulse 1.5s infinite; }
+        .mic-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .mic-btn.recording { background-color: #EF4444; color: white; border-color: #EF4444; animation: pulse 1.5s infinite; }
 
         @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(255, 71, 87, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 71, 87, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
 
         button[type="submit"] {
             width: 100%;
-            padding: 16px;
+            padding: 14px;
             border: none;
-            background-color: var(--accent-color);
-            color: #13102C;
-            font-size: 1.05rem;
+            background-color: var(--accent);
+            color: #FFFFFF;
+            font-size: 1rem;
             font-weight: 700;
-            border-radius: 14px;
+            border-radius: 10px;
             cursor: pointer;
             transition: transform 0.1s ease, background-color 0.2s;
+            font-family: var(--font);
         }
-
         button[type="submit"]:hover { background-color: var(--accent-hover); }
         button[type="submit"]:active { transform: scale(0.98); }
 
-        .message { text-align: center; color: var(--accent-color); margin-top: 15px; font-weight: 500; font-size: 0.95rem; }
+        .message { text-align: center; color: var(--accent); margin-top: 15px; font-weight: 500; font-size: 0.92rem; }
     </style>
 </head>
 <body>
     <div class="form-container">
-        <h1>留下你的问题</h1>
+        <h1>问得好</h1>
+        <p class="subtitle">留下你的问题</p>
         <form id="question-form">
             <div class="input-group">
                 <input type="text" id="name-input" placeholder="你的名字（选填）">
             </div>
             <div class="textarea-container">
                 <textarea id="question-input" placeholder="在此输入你想探讨的内容..." required></textarea>
-                <button type="button" id="mic-btn" class="mic-btn">🎤 语音输入</button>
+                <button type="button" id="mic-btn" class="mic-btn">语音输入</button>
             </div>
             <button type="submit">立即提交</button>
         </form>
@@ -190,12 +177,12 @@
 
                     mediaRecorder.onstart = () => {
                         isRecording = true;
-                        micBtn.textContent = '🛑 录音中...';
+                        micBtn.textContent = '录音中...';
                         micBtn.classList.add('recording');
                     };
 
                     mediaRecorder.onstop = async () => {
-                        micBtn.textContent = '⏳ 识别中...';
+                        micBtn.textContent = '识别中...';
                         micBtn.classList.remove('recording');
                         micBtn.disabled = true;
 
@@ -218,7 +205,7 @@
                             alert('网络请求失败');
                         } finally {
                             isRecording = false;
-                            micBtn.textContent = '🎤 语音输入';
+                            micBtn.textContent = '语音输入';
                             micBtn.disabled = false;
                         }
                         stream.getTracks().forEach(track => track.stop());
@@ -255,8 +242,8 @@
                     throw new Error(errorData.message || '提交失败');
                 }
             } catch (error) {
-                messageEl.textContent = `❌ ${error.message}`;
-                messageEl.style.color = '#ff4757';
+                messageEl.textContent = `\u274c ${error.message}`;
+                messageEl.style.color = '#EF4444';
                 setTimeout(() => messageEl.textContent = '', 3000);
             }
         });

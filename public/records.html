@@ -4,17 +4,49 @@
     <meta charset="UTF-8">
     <title>中奖记录查询</title>
     <style>
-        body { font-family: sans-serif; background: #f4f4f4; padding: 40px; }
-        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-        th { background: #1D224D; color: white; }
-        tr:nth-child(even) { background: #fafafa; }
+        :root {
+            --bg: #F5F7FA;
+            --text: #1A2332;
+            --text-secondary: #6F7B8C;
+            --accent: #4A90D9;
+            --border: #E4E8EE;
+            --radius: 10px;
+            --font: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font);
+            background: var(--bg); color: var(--text);
+            padding: 40px;
+        }
+        .container {
+            max-width: 960px; margin: 0 auto;
+            background: #FFFFFF; padding: 28px; border-radius: var(--radius);
+            border: 1px solid var(--border); box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+        }
+        .header {
+            display: flex; align-items: baseline; justify-content: space-between;
+            margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+        }
+        .header h1 { font-size: 1.4rem; font-weight: 700; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border-bottom: 1px solid var(--border); padding: 12px 14px; text-align: left; font-size: 0.9rem; }
+        th { background: #EDF0F5; color: var(--text); font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.3px; }
+        tr:nth-child(even) td { background: #FAFBFC; }
+        button {
+            margin-top: 18px; padding: 9px 18px; border: 1px solid var(--border);
+            background: #FFFFFF; color: var(--text); font-size: 0.88rem;
+            font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.15s;
+            font-family: var(--font);
+        }
+        button:hover { border-color: var(--accent); color: var(--accent); }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎁 互动中奖历史记录</h1>
+        <div class="header">
+            <h1>互动中奖历史记录</h1>
+        </div>
         <table id="record-table">
             <thead>
                 <tr>
@@ -27,8 +59,7 @@
             </thead>
             <tbody id="record-body"></tbody>
         </table>
-        <br>
-        <button onclick="window.history.back()">返回上页</button>
+        <button onclick="window.history.back()">\u2190 返回上页</button>
     </div>
     <script>
         async function loadRecords() {

@@ -3,143 +3,147 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>问题展示墙</title>
+    <title>互动问题墙</title>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator/qrcode.js"></script>
     <style>
-        /* 基础样式与 Slido 深蓝色主题 */
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
-            background-color: #1D224D; 
-            color: #ffffff; 
-            margin: 0; 
-            padding: 20px; 
+        :root {
+            --bg-color: #13102C;
+            --sidebar-bg: rgba(28, 24, 61, 0.7);
+            --card-bg: rgba(255, 255, 255, 0.06);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --accent-color: #00C49F;
+            --text-main: #FFFFFF;
+            --text-secondary: #A09EC0;
         }
-        .container { display: flex; height: calc(100vh - 40px); }
 
-        /* 侧边栏样式 */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            margin: 0; 
+            padding: 24px; 
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .container { display: flex; height: calc(100vh - 48px); gap: 24px; }
+
+        /* 侧边栏：毛玻璃质感 */
         .sidebar { 
-            width: 250px; 
-            padding: 20px; 
-            background-color: #2C3053; 
-            border-radius: 12px; 
-            text-align: center; 
-            flex-shrink: 0; 
+            width: 280px; 
+            padding: 24px; 
+            background-color: var(--sidebar-bg); 
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 24px; 
             display: flex; 
             flex-direction: column; 
+            flex-shrink: 0; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
         }
-        .sidebar h2 { margin-top: 0; color: #EFEFEF; }
         
-        /* 二维码容器与操作 */
-        #qrcode-container { margin-top: 20px; padding: 15px; background: white; border-radius: 8px; }
-        #qrcode-container p { color: #333; margin: 5px 0 10px; font-weight: bold; }
-        #qrcode img { max-width: 100%; height: auto; }
-        #qrcode-actions { display: flex; gap: 10px; margin-top: 10px; }
-        #qrcode-actions button { 
-            width: 100%; padding: 8px 5px; font-size: 0.85rem; border: none; border-radius: 6px; 
-            color: #EFEFEF; cursor: pointer; transition: background 0.2s; 
-        }
-        #copy-qr-btn { background-color: #4A5073; }
-        #download-qr-btn { background-color: #38C695; }
+        .sidebar h2 { margin-top: 0; font-size: 1.4rem; font-weight: 700; letter-spacing: -0.5px; }
 
-        /* 新增：抽奖模式选择器样式 */
+        #qrcode-container { margin-top: 15px; padding: 16px; background: #FFFFFF; border-radius: 16px; text-align: center; }
+        #qrcode-container p { color: #13102C; margin: 0 0 10px; font-weight: 700; font-size: 0.9rem; }
+        #qrcode img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+        
+        #qrcode-actions { display: flex; gap: 8px; margin-top: 12px; }
+        #qrcode-actions button { 
+            flex: 1; padding: 8px; font-size: 0.8rem; border: none; border-radius: 8px; 
+            color: #fff; cursor: pointer; font-weight: 600; transition: opacity 0.2s; 
+        }
+        #copy-qr-btn { background-color: #3B3670; }
+        #download-qr-btn { background-color: var(--accent-color); color: #13102C !important; }
+
         .mode-selector {
             margin-top: 20px;
-            padding: 15px;
-            background: rgba(255,255,255,0.05);
-            border-radius: 8px;
-            text-align: left;
+            padding: 14px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 14px;
+            border: 1px solid var(--border-color);
         }
-        .mode-selector label {
-            display: block;
-            font-size: 0.8rem;
-            color: #aaa;
-            margin-bottom: 8px;
-        }
+        .mode-selector label { display: block; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; }
         .mode-selector select {
-            width: 100%;
-            padding: 8px;
-            background: #1D224D;
-            color: white;
-            border: 1px solid #38C695;
-            border-radius: 4px;
-            cursor: pointer;
-            outline: none;
+            width: 100%; padding: 8px 12px; background: rgba(255,255,255,0.08);
+            color: white; border: 1px solid var(--border-color); border-radius: 8px;
+            cursor: pointer; outline: none; font-size: 0.9rem;
         }
 
-        /* 实时在线计数器 */
-        .live-counter { margin-top: auto; padding-top: 20px; border-top: 1px solid #4A5073; }
-        .live-counter-number { font-size: 2.5rem; font-weight: bold; color: #38C695; }
-        .live-counter-label { font-size: 1rem; color: #aaa; }
+        .live-counter { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--border-color); display: flex; align-items: baseline; gap: 10px; }
+        .live-counter-number { font-size: 2.2rem; font-weight: 800; color: var(--accent-color); line-height: 1; }
+        .live-counter-label { font-size: 0.9rem; color: var(--text-secondary); font-weight: 500; }
 
-        /* 卡片墙布局 */
+        /* 卡片流区域 */
         .card-wall { 
             flex-grow: 1; 
-            margin-left: 20px; 
             display: flex; 
             flex-wrap: wrap; 
             align-content: flex-start; 
             gap: 20px; 
             overflow-y: auto; 
-            padding: 5px; 
+            padding-right: 6px; 
         }
-        .card-wall::-webkit-scrollbar { width: 8px; }
-        .card-wall::-webkit-scrollbar-track { background: #2C3053; border-radius: 4px; }
-        .card-wall::-webkit-scrollbar-thumb { background: #4A5073; border-radius: 4px; }
+        .card-wall::-webkit-scrollbar { width: 6px; }
+        .card-wall::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
 
-        /* 问题卡片 */
+        /* 问题卡片：现代网格半透明卡片 */
         .card {
             position: relative;
-            background-color: #fff; 
-            color: #333; 
-            border-radius: 8px; 
-            padding: 20px; 
-            width: calc(33.333% - 27px); 
+            background-color: var(--card-bg); 
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            color: var(--text-main); 
+            border-radius: 20px; 
+            padding: 24px; 
+            width: calc(33.333% - 14px); 
             min-width: 280px; 
-            box-shadow: 0 5px 20px rgba(0,0,0,0.1); 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15); 
             display: flex; 
             flex-direction: column; 
-            animation: fadeIn 0.5s ease; 
-            transition: transform 0.2s ease, box-shadow 0.3s;
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); 
+            transition: transform 0.2s ease, border-color 0.2s;
+            box-sizing: border-box;
         }
-        .card:hover { transform: translateY(-5px); }
-        .card .question-text { font-size: 20px; line-height: 1.4; word-wrap: break-word; flex-grow: 1; }
+        .card:hover { transform: translateY(-4px); border-color: rgba(0, 196, 159, 0.3); }
+        .card .question-text { font-size: 1.15rem; line-height: 1.5; word-wrap: break-word; flex-grow: 1; font-weight: 500; }
         
         .card-footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 15px;
-            font-size: 14px;
-            color: #555;
+            margin-top: 20px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
         }
-        .timestamp { color: #777; font-size: 12px; }
-        .author-name { font-weight: 500; text-align: right; }
+        .timestamp { font-size: 0.75rem; }
+        .author-name { font-weight: 600; color: #E2E0FF; }
 
         .delete-btn { 
-            position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; 
-            border-radius: 50%; border: none; background-color: #e0e0e0; color: #555; 
-            cursor: pointer; opacity: 0; transition: opacity 0.2s, background 0.2s; 
+            position: absolute; top: 16px; right: 16px; width: 26px; height: 26px; 
+            border-radius: 50%; border: none; background-color: rgba(255,255,255,0.1); color: var(--text-secondary); 
+            cursor: pointer; opacity: 0; transition: all 0.2s; display: flex; align-items: center; justify-content: center; font-size: 1rem;
         }
         .card:hover .delete-btn { opacity: 1; }
-        .delete-btn:hover { background-color: #f44336; color: white; }
+        .delete-btn:hover { background-color: #ff4757; color: white; }
         
         .lottery-link-btn {
-            margin-top: 10px; padding: 6px; border: 1px dashed #38C695; 
-            background: transparent; color: #38C695; border-radius: 4px; 
-            cursor: pointer; font-size: 12px; transition: all 0.2s;
+            margin-top: 14px; padding: 8px; border: 1px dashed rgba(0, 196, 159, 0.4); 
+            background: rgba(0, 196, 159, 0.05); color: var(--accent-color); border-radius: 10px; 
+            cursor: pointer; font-size: 0.85rem; font-weight: 600; transition: all 0.2s; text-align: center;
         }
-        .lottery-link-btn:hover { background: #38C695; color: #fff; }
+        .lottery-link-btn:hover { background: var(--accent-color); color: #13102C; }
 
-        .card.deleting { opacity: 0; transform: scale(0.95); transition: all 0.4s; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .card.deleting { opacity: 0; transform: scale(0.9); transition: all 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
 
-        @media (max-width: 900px) { .card { width: calc(50% - 25px); } }
-        @media (max-width: 600px) { 
-            body { overflow: auto; }
+        @media (max-width: 1024px) { .card { width: calc(50% - 10px); } }
+        @media (max-width: 768px) { 
+            body { overflow: auto; height: auto; }
             .container { flex-direction: column; height: auto; } 
-            .sidebar { width: auto; margin-bottom: 20px; } 
-            .card-wall { margin-left: 0; overflow-y: visible; } 
-            .card { width: 100%; min-width: unset; } 
+            .sidebar { width: auto; } 
+            .card-wall { overflow-y: visible; } 
+            .card { width: 100%; } 
         }
     </style>
 </head>
@@ -148,7 +152,7 @@
         <div class="sidebar">
             <h2 id="session-title">加载中...</h2>
             <div id="qrcode-container">
-                <p>手机扫码提问</p>
+                <p>扫码加入互动</p>
                 <div id="qrcode"></div>
                 <div id="qrcode-actions">
                     <button id="copy-qr-btn">复制</button>
@@ -157,7 +161,7 @@
             </div>
 
             <div class="mode-selector">
-                <label>默认抽奖模式：</label>
+                <label>抽奖模式</label>
                 <select id="lottery-mode-select">
                     <option value="lottery-flip.html">🃏 翻卡片模式</option>
                     <option value="lottery-ball.html">⚽ 物理碰撞球</option>
@@ -166,7 +170,7 @@
 
             <div class="live-counter">
                 <div id="client-count" class="live-counter-number">0</div>
-                <div class="live-counter-label">当前在线</div>
+                <div class="live-counter-label">在线参与</div>
             </div>
         </div>
         <div id="card-wall" class="card-wall"></div>
@@ -177,17 +181,11 @@
         const sessionCode = pathParts[pathParts.length - 1];
         const clientUrl = `${window.location.protocol}//${window.location.host}/session/${sessionCode}/ask`;
 
-        // 初始化模式选择与记忆功能
         const modeSelect = document.getElementById('lottery-mode-select');
         const savedMode = localStorage.getItem('lottery_mode');
-        if (savedMode) {
-            modeSelect.value = savedMode;
-        }
-        modeSelect.onchange = (e) => {
-            localStorage.setItem('lottery_mode', e.target.value);
-        };
+        if (savedMode) modeSelect.value = savedMode;
+        modeSelect.onchange = (e) => localStorage.setItem('lottery_mode', e.target.value);
 
-        // 生成二维码
         try { 
             const qr = qrcode(4, 'L'); 
             qr.addData(clientUrl); 
@@ -201,8 +199,8 @@
                 const response = await fetch(qrImgElement.src);
                 const blob = await response.blob();
                 await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-                alert('已复制！');
-            } catch (err) { alert('复制失败。'); }
+                alert('已复制二维码！');
+            } catch (err) { alert('复制失败'); }
         };
         document.getElementById('download-qr-btn').onclick = () => {
             const link = document.createElement('a');
@@ -211,7 +209,6 @@
             link.click();
         };
 
-        // WebSocket 逻辑
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${wsProtocol}//${window.location.host}`;
         let ws;
@@ -227,14 +224,13 @@
                         document.getElementById('client-count').textContent = data.count;
                     } else if (data.type === 'question_deleted') {
                         const card = document.querySelector(`.card[data-question-id="${data.payload.questionId}"]`);
-                        if (card) { card.classList.add('deleting'); setTimeout(() => card.remove(), 400); }
+                        if (card) { card.classList.add('deleting'); setTimeout(() => card.remove(), 300); }
                     }
-                } catch (e) { console.error("WS错误", e); }
+                } catch (e) { console.error(e); }
             };
             ws.onclose = () => setTimeout(connectWebSocket, 1000);
         }
 
-        // 创建问题卡片
         function createQuestionCard(questionData) {
             const wall = document.getElementById('card-wall');
             const card = document.createElement('div');
@@ -252,26 +248,24 @@
             const time = document.createElement('span');
             time.className = 'timestamp';
             if (questionData.createdAt) {
-                time.textContent = new Date(questionData.createdAt).toLocaleString('ja-JP', {
-                    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false
+                time.textContent = new Date(questionData.createdAt).toLocaleTimeString('ja-JP', {
+                    hour: '2-digit', minute: '2-digit', hour12: false
                 });
             }
 
             const author = document.createElement('span');
             author.className = 'author-name';
-            author.textContent = `— ${questionData.name}`;
+            author.textContent = questionData.name;
 
             footer.appendChild(time);
             footer.appendChild(author);
 
-            // 抽奖按钮逻辑：使用记忆的模式并携带日期参数
             const lotteryBtn = document.createElement('button');
             lotteryBtn.className = 'lottery-link-btn';
             lotteryBtn.textContent = '🎁 针对本场抽奖';
             lotteryBtn.onclick = () => {
                 const qDate = new Date(questionData.createdAt).toLocaleDateString('ja-JP');
-                const selectedMode = modeSelect.value;
-                window.location.href = `/${selectedMode}?code=${sessionCode}&date=${qDate}`;
+                window.location.href = `/${modeSelect.value}?code=${sessionCode}&date=${qDate}`;
             };
 
             const delBtn = document.createElement('button');
@@ -279,7 +273,7 @@
             delBtn.innerHTML = '&times;';
             delBtn.onclick = (e) => {
                 e.stopPropagation();
-                if (confirm('确定移除？')) {
+                if (confirm('确定删除此问题？')) {
                     fetch(`/api/questions/${questionData._id}`, { method: 'DELETE' });
                 }
             };
@@ -291,7 +285,6 @@
             wall.prepend(card);
         }
 
-        // 初始化数据加载与哈希定位
         async function loadInitialData() {
             try {
                 const response = await fetch(`/api/sessions/${sessionCode}`);
@@ -304,12 +297,16 @@
                         const target = document.querySelector(window.location.hash);
                         if (target) {
                             target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            target.style.boxShadow = '0 0 25px #FFD700';
-                            setTimeout(() => target.style.boxShadow = '', 3000);
+                            target.style.borderColor = '#00C49F';
+                            target.style.boxShadow = '0 0 30px rgba(0, 196, 159, 0.4)';
+                            setTimeout(() => {
+                                target.style.borderColor = '';
+                                target.style.boxShadow = '';
+                            }, 3000);
                         }
-                    }, 500);
+                    }, 400);
                 }
-            } catch(e) { console.error("加载失败", e); }
+            } catch(e) { console.error(e); }
         }
 
         loadInitialData();

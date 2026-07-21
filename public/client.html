@@ -44,7 +44,7 @@
 
     <script>
         const pathParts = window.location.pathname.split('/');
-        const sessionCode = pathParts[pathParts.length - 2];
+        const sessionCode = pathParts[pathParts.length - 1];
 
         const form = document.getElementById('question-form');
         const nameInput = document.getElementById('name-input');
@@ -52,70 +52,68 @@
         const messageEl = document.getElementById('message');
         const micBtn = document.getElementById('mic-btn');
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
 
-        if (SpeechRecognition) {
-            const recognition = new SpeechRecognition();
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            recognition.lang = 'zh-CN';
+        micBtn.addEventListener('click', async () => {
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
 
-            let isRecording = false;
+                    mediaRecorder.ondataavailable = event => {
+                        if (event.data.size > 0) audioChunks.push(event.data);
+                    };
 
-            micBtn.addEventListener('click', () => {
-                if (!isRecording) {
-                    try {
-                        recognition.start();
+                    mediaRecorder.onstart = () => {
                         isRecording = true;
-                        micBtn.textContent = '🛑 录音中...';
+                        micBtn.textContent = '🛑 录音中...点击停止';
                         micBtn.classList.add('recording');
-                    } catch (err) {
-                        console.error('无法启动录音:', err);
-                    }
-                } else {
-                    recognition.stop();
-                    stopRecordingState();
-                }
-            });
+                    };
 
-            recognition.onresult = (event) => {
-                let transcript = '';
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    if (event.results[i].isFinal) {
-                        transcript += event.results[i][0].transcript;
-                    }
-                }
-                if (transcript) {
-                    questionInput.value += transcript;
-                }
-            };
+                    mediaRecorder.onstop = async () => {
+                        micBtn.textContent = '⏳ 识别中...';
+                        micBtn.classList.remove('recording');
+                        micBtn.disabled = true;
 
-            recognition.onerror = (event) => {
-                console.error('语音识别错误:', event.error);
-                stopRecordingState();
-                
-                if (event.error === 'not-allowed') {
-                    micBtn.textContent = '❌ 权限被拒或非HTTPS环境';
-                    micBtn.style.color = '#dc3545';
-                    setTimeout(() => {
-                        micBtn.textContent = '🎤 语音输入';
-                        micBtn.style.color = '';
-                    }, 3000);
+                        const audioBlob = new Blob(audioChunks);
+                        const formData = new FormData();
+                        formData.append('audio', audioBlob, 'record.webm');
+
+                        try {
+                            const response = await fetch('/api/voice-to-text', {
+                                method: 'POST',
+                                body: formData
+                            });
+                            const data = await response.json();
+                            if (response.ok) {
+                                questionInput.value += data.text;
+                            } else {
+                                alert(data.message || '识别失败');
+                            }
+                        } catch (err) {
+                            alert('网络请求失败');
+                        } finally {
+                            isRecording = false;
+                            micBtn.textContent = '🎤 语音输入';
+                            micBtn.disabled = false;
+                        }
+                        
+                        stream.getTracks().forEach(track => track.stop());
+                    };
+
+                    mediaRecorder.start();
+                } catch (err) {
+                    alert('获取麦克风权限失败，请确保在微信或浏览器中已授权。');
                 }
-            };
-
-            recognition.onend = () => {
-                stopRecordingState();
-            };
-
-            function stopRecordingState() {
-                isRecording = false;
-                micBtn.textContent = '🎤 语音输入';
-                micBtn.classList.remove('recording');
+            } else {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                }
             }
-        } else {
-            micBtn.style.display = 'none';
-        }
+        });
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -128,10 +126,7 @@
                 const response = await fetch(`/api/ask/${sessionCode}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        question: question,
-                        name: name 
-                    })
+                    body: JSON.stringify({ question: question, name: name })
                 });
 
                 if (response.ok) {

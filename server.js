@@ -6,6 +6,20 @@ const path = require('path');
 const mongoose = require('mongoose');
 const basicAuth = require('express-basic-auth');
 const { nanoid } = require('nanoid');
+const multer = require('multer');
+const fs = require('fs');
+const os = require('os');
+const AipSpeechClient = require('baidu-aip-sdk').speech;
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+
+// --- 百度语音配置 ---
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+const APP_ID = process.env.BAIDU_APP_ID || '你的APP_ID';
+const API_KEY = process.env.BAIDU_API_KEY || '你的API_KEY';
+const SECRET_KEY = process.env.BAIDU_SECRET_KEY || '你的SECRET_KEY';
+const baiduClient = new AipSpeechClient(APP_ID, API_KEY, SECRET_KEY);
+const upload = multer({ dest: os.tmpdir() });
 
 // --- 数据库连接 (Database Setup) ---
 const MONGO_URI = process.env.MONGO_URI; 
@@ -119,7 +133,40 @@ app.get('/api/sessions/:code', async (req, res) => {
     } catch (e) { res.status(500).json({ message: '获取信息失败' }); }
 });
 
-// B. 提问与删除 API
+// B. 语音转文字 API (新增)
+app.post('/api/voice-to-text', upload.single('audio'), (req, res) => {
+    if (!req.file) return res.status(400).json({ message: '未找到音频文件' });
+    
+    const inputPath = req.file.path;
+    const outputPath = `${inputPath}.pcm`;
+
+    ffmpeg(inputPath)
+        .outputOptions(['-f s16le', '-acodec pcm_s16le', '-ac 1', '-ar 16000'])
+        .save(outputPath)
+        .on('end', () => {
+            const voiceBuffer = fs.readFileSync(outputPath);
+            baiduClient.recognize(voiceBuffer, 'pcm', 16000).then((result) => {
+                if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+                if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+                if (result.err_no === 0) {
+                    res.json({ text: result.result[0] });
+                } else {
+                    res.status(500).json({ message: '识别失败: ' + result.err_msg });
+                }
+            }).catch(() => {
+                if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+                if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+                res.status(500).json({ message: '百度API请求错误' });
+            });
+        })
+        .on('error', () => {
+            if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+            if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+            res.status(500).json({ message: '音频转码失败' });
+        });
+});
+
+// C. 提问与删除 API
 app.post('/api/ask/:code', async (req, res) => {
     const { question, name } = req.body;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress; // 获取 IP
@@ -157,7 +204,7 @@ app.delete('/api/questions/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ message: '删除失败' }); }
 });
 
-// C. 数据导出 API
+// D. 数据导出 API
 app.get('/api/questions', adminAuth, async (req, res) => {
     const { start, end } = req.query;
     try {
@@ -167,7 +214,7 @@ app.get('/api/questions', adminAuth, async (req, res) => {
     } catch (error) { res.status(500).json({ message: '服务器错误' }); }
 });
 
-// D. 中奖记录 API
+// E. 中奖记录 API
 app.post('/api/lottery-records', async (req, res) => {
     try {
         const record = new LotteryRecord(req.body);

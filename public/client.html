@@ -44,7 +44,7 @@
             if (!question) return;
 
             try {
-                // 2. 将问题提交到带有场次代码的动态URL
+                // 2. 将问题提交到带有场次代码的动态URL  backup
                 const response = await fetch(`/api/ask/${sessionCode}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

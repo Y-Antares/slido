@@ -56,7 +56,7 @@
 
         if (SpeechRecognition) {
             const recognition = new SpeechRecognition();
-            recognition.continuous = true;
+            recognition.continuous = false;
             recognition.interimResults = false;
             recognition.lang = 'zh-CN';
 
@@ -67,16 +67,14 @@
                     try {
                         recognition.start();
                         isRecording = true;
-                        micBtn.textContent = '🛑 停止录音';
+                        micBtn.textContent = '🛑 录音中...';
                         micBtn.classList.add('recording');
                     } catch (err) {
                         console.error('无法启动录音:', err);
                     }
                 } else {
                     recognition.stop();
-                    isRecording = false;
-                    micBtn.textContent = '🎤 语音输入';
-                    micBtn.classList.remove('recording');
+                    stopRecordingState();
                 }
             });
 
@@ -95,8 +93,14 @@
             recognition.onerror = (event) => {
                 console.error('语音识别错误:', event.error);
                 stopRecordingState();
+                
                 if (event.error === 'not-allowed') {
-                    alert('请允许使用麦克风权限');
+                    micBtn.textContent = '❌ 权限被拒或非HTTPS环境';
+                    micBtn.style.color = '#dc3545';
+                    setTimeout(() => {
+                        micBtn.textContent = '🎤 语音输入';
+                        micBtn.style.color = '';
+                    }, 3000);
                 }
             };
 

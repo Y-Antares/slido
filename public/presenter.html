@@ -17,7 +17,7 @@
             --border: #E4E8EE;
             --shadow: 0 2px 12px rgba(0,0,0,0.05);
             --radius: 12px;
-            --font: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            --font: Arial, 'Microsoft YaHei', sans-serif;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -40,13 +40,13 @@
         }
         .sidebar h2 {
             margin: 0 0 4px;
-            font-size: 1.4rem;
+            font-size: 1.65rem;
             font-weight: 700;
             letter-spacing: -0.5px;
             color: var(--text);
         }
         .session-subtitle {
-            font-size: 0.82rem;
+            font-size: 0.9rem;
             color: var(--text-secondary);
             margin-bottom: 22px;
         }
@@ -62,7 +62,7 @@
             color: var(--text-secondary);
             margin: 0 0 10px;
             font-weight: 600;
-            font-size: 0.8rem;
+            font-size: 0.88rem;
         }
         #qrcode img { max-width: 100%; height: auto; display: block; margin: 0 auto; }
 
@@ -81,7 +81,7 @@
             margin-bottom: auto;
         }
         .mode-selector label {
-            display: block; font-size: 0.7rem; color: var(--text-secondary);
+            display: block; font-size: 0.8rem; color: var(--text-secondary);
             margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
         }
         .mode-selector select {
@@ -98,7 +98,7 @@
         .live-counter-number {
             font-size: 2.2rem; font-weight: 800; color: var(--accent); line-height: 1;
         }
-        .live-counter-label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; }
+        .live-counter-label { font-size: 0.95rem; color: var(--text-secondary); font-weight: 500; }
 
         .card-wall {
             flex-grow: 1;
@@ -166,7 +166,17 @@
         }
         .lottery-link-btn:hover { background: var(--accent); color: white; }
 
-        .card.deleting { opacity: 0; transform: scale(0.9); transition: all 0.3s; }
+        .card.hash-highlight {
+            border-color: #4A90D9 !important;
+            box-shadow: 0 0 0 4px rgba(74,144,217,0.25), 0 8px 32px rgba(74,144,217,0.2) !important;
+            transform: scale(1.03);
+            z-index: 5;
+            animation: pulseGlow 0.8s ease-in-out 3;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 4px rgba(74,144,217,0.25), 0 8px 32px rgba(74,144,217,0.2); }
+            50% { box-shadow: 0 0 0 12px rgba(74,144,217,0.08), 0 12px 48px rgba(74,144,217,0.35); }
+        }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }
@@ -333,14 +343,12 @@
                         const target = document.querySelector(window.location.hash);
                         if (target) {
                             target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                            target.style.borderColor = '#4A90D9';
-                            target.style.boxShadow = '0 0 30px rgba(74, 144, 217, 0.3)';
+                            target.classList.add('hash-highlight');
                             setTimeout(() => {
-                                target.style.borderColor = '';
-                                target.style.boxShadow = '';
+                                target.classList.remove('hash-highlight');
                             }, 3000);
                         }
-                    }, 400);
+                    }, 500);
                 }
             } catch(e) { console.error(e); }
         }

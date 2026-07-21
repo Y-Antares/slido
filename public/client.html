@@ -13,7 +13,7 @@
             --accent-hover: #3A7BC8;
             --text: #1A2332;
             --text-secondary: #6F7B8C;
-            --font: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            --font: Arial, 'Microsoft YaHei', sans-serif;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -242,7 +242,7 @@
                     throw new Error(errorData.message || '提交失败');
                 }
             } catch (error) {
-                messageEl.textContent = `\u274c ${error.message}`;
+                messageEl.textContent = `❌ ${error.message}`;
                 messageEl.style.color = '#EF4444';
                 setTimeout(() => messageEl.textContent = '', 3000);
             }

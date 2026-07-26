@@ -294,8 +294,14 @@
             const time = document.createElement('span');
             time.className = 'timestamp';
             if (questionData.createdAt) {
-                time.textContent = new Date(questionData.createdAt).toLocaleTimeString('ja-JP', {
-                    hour: '2-digit', minute: '2-digit', hour12: false
+                // 同时展示年月日与时分
+                time.textContent = new Date(questionData.createdAt).toLocaleString('ja-JP', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
                 });
             }
 

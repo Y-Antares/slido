@@ -240,13 +240,27 @@
         } catch (e) { document.getElementById('qrcode').textContent = "二维码错误"; }
 
         const qrImgElement = document.querySelector('#qrcode img');
-        document.getElementById('copy-qr-btn').onclick = async () => {
-            try {
-                const response = await fetch(qrImgElement.src);
-                const blob = await response.blob();
-                await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
-                alert('已复制二维码！');
-            } catch (err) { alert('复制失败'); }
+        document.getElementById('copy-qr-btn').onclick = () => {
+            const img = document.querySelector('#qrcode img');
+            if (!img) {
+                alert('二维码尚未生成');
+                return;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = img.naturalWidth || img.width;
+            canvas.height = img.naturalHeight || img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            
+            canvas.toBlob(async (blob) => {
+                try {
+                    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                    alert('已成功复制二维码！');
+                } catch (err) {
+                    console.error(err);
+                    alert('复制失败，请尝试使用下载功能。');
+                }
+            }, 'image/png');
         };
         document.getElementById('download-qr-btn').onclick = () => {
             const link = document.createElement('a');

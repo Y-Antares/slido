@@ -100,17 +100,49 @@
         }
         .live-counter-label { font-size: 0.95rem; color: var(--text-secondary); font-weight: 500; }
 
+        /* 修改后的墙体排版样式 */
         .card-wall {
             flex-grow: 1;
+            overflow-y: auto;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+        .card-wall::-webkit-scrollbar { width: 6px; }
+        .card-wall::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 3px; }
+
+        /* 新增：日期分组与分割线样式 */
+        .date-group {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .date-separator {
+            display: flex;
+            align-items: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .date-separator::before,
+        .date-separator::after {
+            content: '';
+            flex-grow: 1;
+            height: 1px;
+            background-color: var(--border);
+        }
+        .date-separator::before { margin-right: 16px; }
+        .date-separator::after { margin-left: 16px; }
+
+        .date-cards {
             display: flex;
             flex-wrap: wrap;
             align-content: flex-start;
             gap: 18px;
-            overflow-y: auto;
-            padding: 30px;
         }
-        .card-wall::-webkit-scrollbar { width: 6px; }
-        .card-wall::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 3px; }
 
         .card {
             position: relative;
@@ -291,8 +323,33 @@
             ws.onclose = () => setTimeout(connectWebSocket, 1000);
         }
 
+        /* 替换后的卡片生成逻辑，加入日期分组检测与创建 */
         function createQuestionCard(questionData) {
             const wall = document.getElementById('card-wall');
+            
+            const qDate = new Date(questionData.createdAt || Date.now());
+            const dateStr = qDate.toLocaleDateString('ja-JP');
+            const groupId = 'group-' + dateStr.replace(/\//g, '-');
+
+            let groupContainer = document.getElementById(groupId);
+            if (!groupContainer) {
+                groupContainer = document.createElement('div');
+                groupContainer.className = 'date-group';
+                groupContainer.id = groupId;
+
+                const separator = document.createElement('div');
+                separator.className = 'date-separator';
+                separator.textContent = dateStr;
+
+                const cardsContainer = document.createElement('div');
+                cardsContainer.className = 'date-cards';
+
+                groupContainer.appendChild(separator);
+                groupContainer.appendChild(cardsContainer);
+
+                wall.prepend(groupContainer);
+            }
+
             const card = document.createElement('div');
             card.className = 'card';
             card.dataset.questionId = questionData._id;
@@ -308,7 +365,6 @@
             const time = document.createElement('span');
             time.className = 'timestamp';
             if (questionData.createdAt) {
-                // 同时展示年月日与时分
                 time.textContent = new Date(questionData.createdAt).toLocaleString('ja-JP', {
                     year: 'numeric',
                     month: '2-digit',
@@ -330,8 +386,7 @@
             lotteryBtn.className = 'lottery-link-btn';
             lotteryBtn.textContent = '针对本场抽奖';
             lotteryBtn.onclick = () => {
-                const qDate = new Date(questionData.createdAt).toLocaleDateString('ja-JP');
-                window.location.href = `/${modeSelect.value}?code=${sessionCode}&date=${qDate}`;
+                window.location.href = `/${modeSelect.value}?code=${sessionCode}&date=${dateStr}`;
             };
 
             const delBtn = document.createElement('button');
@@ -348,7 +403,9 @@
             card.appendChild(text);
             card.appendChild(footer);
             card.appendChild(lotteryBtn);
-            wall.prepend(card);
+            
+            const targetCardsContainer = groupContainer.querySelector('.date-cards');
+            targetCardsContainer.prepend(card);
         }
 
         async function loadInitialData() {

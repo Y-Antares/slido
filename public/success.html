@@ -18,20 +18,30 @@
             font-family: var(--font);
             background-color: var(--bg);
             display: flex; justify-content: center; align-items: center;
-            height: 100vh;
+            min-height: 100vh; padding: 20px;
         }
         .container {
-            background: #FFFFFF; padding: 40px; border-radius: 16px;
+            background: #FFFFFF; padding: 32px 24px; border-radius: 16px;
             box-shadow: 0 4px 24px rgba(0,0,0,0.06);
             border: 1px solid #E4E8EE;
-            width: 90%; max-width: 400px; text-align: center;
+            width: 100%; max-width: 440px; text-align: center;
         }
         .brand {
             font-size: 1.6rem; font-weight: 700; color: var(--accent);
             white-space: nowrap; margin-bottom: 20px;
         }
         h1 { color: var(--text); margin: 0 0 8px; font-size: 1.3rem; font-weight: 700; }
-        p { color: var(--text-secondary); font-size: 0.92rem; margin-bottom: 28px; }
+        p { color: var(--text-secondary); font-size: 0.92rem; margin-bottom: 20px; line-height: 1.5; }
+        
+        .history-box {
+            text-align: left; background: var(--bg); padding: 14px;
+            border-radius: 10px; margin-bottom: 20px; max-height: 180px;
+            overflow-y: auto; border: 1px solid #E4E8EE; display: none;
+        }
+        .history-title { font-size: 0.85rem; font-weight: bold; color: var(--text); margin-bottom: 8px; }
+        .history-item { font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 6px; border-bottom: 1px solid #E4E8EE; padding-bottom: 4px; }
+        .history-item span { color: var(--text); font-weight: 500; }
+
         .btn {
             display: inline-block; width: 100%; padding: 14px; border: none;
             background-color: var(--accent); color: white; font-size: 1rem;
@@ -45,14 +55,48 @@
 <body>
     <div class="container">
         <div class="brand">问得好！</div>
-        <h1>提交成功</h1>
-        <p>你的问题已经成功发送到大屏幕展示墙</p>
+        <h1 id="page-title">提交成功</h1>
+        <p id="status-text">你的问题已经成功发送到大屏幕展示墙</p>
+        
+        <div id="history-container" class="history-box">
+            <div class="history-title">您在本场活动中的所有提交记录：</div>
+            <div id="history-list"></div>
+        </div>
+
         <a href="#" id="back-btn" class="btn">继续提问</a>
     </div>
     <script>
         const pathParts = window.location.pathname.split('/');
         const sessionCode = pathParts[pathParts.length - 2];
         document.getElementById('back-btn').href = `/session/${sessionCode}/ask`;
+
+        const storageKey = `submitted_questions_${sessionCode}`;
+        const submittedList = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const isDuplicateAttempt = urlParams.get('dup') === '1';
+        const duplicateText = urlParams.get('text') || '';
+
+        const statusText = document.getElementById('status-text');
+        const historyContainer = document.getElementById('history-container');
+        const historyList = document.getElementById('history-list');
+
+        if (isDuplicateAttempt && duplicateText) {
+            document.getElementById('page-title').textContent = '提示';
+            statusText.textContent = `您已提交过 "${duplicateText}"，请勿重复提交！`;
+            statusText.style.color = '#EF4444';
+            statusText.style.fontWeight = '600';
+        }
+
+        if (submittedList.length > 0) {
+            historyContainer.style.display = 'block';
+            historyList.innerHTML = submittedList.map((item, index) => `
+                <div class="history-item">
+                    <span>${index + 1}. ${item.question}</span>
+                    <div style="font-size: 0.75rem; color: #9AA5B1; margin-top: 2px;">${new Date(item.time).toLocaleString('ja-JP', { hour12: false })}</div>
+                </div>
+            `).join('');
+        }
     </script>
 </body>
 </html>

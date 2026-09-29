@@ -228,6 +228,16 @@
             const name = nameInput.value.trim();
             if (!question) return;
 
+            const storageKey = `submitted_questions_${sessionCode}`;
+            let submittedList = JSON.parse(localStorage.getItem(storageKey) || '[]');
+
+            // 检查是否存在完全相同的内容
+            const isDuplicate = submittedList.some(item => item.question === question);
+            if (isDuplicate) {
+                window.location.href = `/session/${sessionCode}/success?dup=1&text=${encodeURIComponent(question)}`;
+                return;
+            }
+
             try {
                 const response = await fetch(`/api/ask/${sessionCode}`, {
                     method: 'POST',
@@ -236,7 +246,9 @@
                 });
 
                 if (response.ok) {
-                    window.location.href = `/session/${sessionCode}/success`;
+                    submittedList.push({ question, name, time: new Date().toISOString() });
+                    localStorage.setItem(storageKey, JSON.stringify(submittedList));
+                    window.location.href = `/session/${sessionCode}/success?dup=0`;
                 } else {
                     const errorData = await response.json();
                     throw new Error(errorData.message || '提交失败');

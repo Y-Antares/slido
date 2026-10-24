@@ -93,7 +93,7 @@ function buildLotteryPool(questions, period = 'all') {
 const lotteryRecordSchema = new mongoose.Schema({
     sessionName: String,
     sessionCode: String,
-    date: String, // 抽奖针对的问题日期（北京时间）
+    date: String, // 抽奖针对的问题日期
     period: { type: String, enum: ['all', 'am', 'pm'], default: 'all' },
     questionText: String,
     userName: String,

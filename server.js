@@ -61,10 +61,18 @@ function chinaDate(value) {
         timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit'
     }).format(new Date(value)).replace(/-/g, '/');
 }
-function buildLotteryPool(questions) {
+function chinaPeriod(value) {
+    const hour = Number(new Intl.DateTimeFormat('en-GB', {
+        timeZone: 'Asia/Shanghai', hour: '2-digit', hourCycle: 'h23'
+    }).format(new Date(value)));
+    return hour < 12 ? 'am' : 'pm';
+}
+function buildLotteryPool(questions, period = 'all') {
     const groups = new Map();
     for (const q of questions) {
         if (!q.text || !q.text.trim()) continue;
+        // 必须先按时段筛选，再按人合并，避免上午问题把下午参与资格挤掉。
+        if (period !== 'all' && chinaPeriod(q.createdAt) !== period) continue;
         // 历史具名记录按姓名合并；历史匿名记录无法追溯身份，保守合并为一份资格。
         const identity = q.participantId ? `id:${q.participantId}` : `legacy:${(q.name || '匿名').trim() || '匿名'}`;
         const key = JSON.stringify([chinaDate(q.createdAt), identity]);
@@ -82,7 +90,8 @@ function buildLotteryPool(questions) {
 const lotteryRecordSchema = new mongoose.Schema({
     sessionName: String,
     sessionCode: String,
-    date: String, // 抽奖针对的问题日期
+    date: String, // 抽奖针对的问题日期（北京时间）
+    period: { type: String, enum: ['all', 'am', 'pm'], default: 'all' },
     questionText: String,
     userName: String,
     createdAt: { type: Date, default: Date.now }
@@ -168,15 +177,18 @@ app.get('/api/sessions/:code', async (req, res) => {
     } catch (e) { res.status(500).json({ message: '获取信息失败' }); }
 });
 
-// 所有抽奖页面共享同一候选名单规则：每个参与者在所选日期仅一份资格。
+// 同一场次可按日期和上下午抽奖；每人每个所选范围仅一份资格。
 app.get('/api/sessions/:code/lottery-pool', async (req, res) => {
+    const period = req.query.period || 'all';
+    if (!['all', 'am', 'pm'].includes(period)) return res.status(400).json({ message: '无效的抽奖时段' });
     try {
         const session = await Session.findOne({ code: req.params.code });
         if (!session) return res.status(404).json({ message: '场次不存在' });
         const questions = await Question.find({ sessionId: session._id })
             .select('+participantId').sort({ createdAt: 1 }).lean();
         res.set('Cache-Control', 'no-store');
-        res.json({ session, questions: buildLotteryPool(questions) });
+        const dates = [...new Set(questions.map(q => chinaDate(q.createdAt)))].sort().reverse();
+        res.json({ session, dates, period, questions: buildLotteryPool(questions, period) });
     } catch (e) { res.status(500).json({ message: '获取抽奖名单失败' }); }
 });
 

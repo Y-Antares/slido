@@ -70,7 +70,7 @@
             for (const r of data) {
                 const row = document.createElement('tr');
                 for (const value of [new Date(r.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
-                    `${r.sessionName || '历史场次'} / ${r.sessionCode}`, r.date, r.userName, r.questionText]) {
+                    `${r.sessionName || '历史场次'} / ${r.sessionCode}`, `${r.date || ''} · ${{ am: '上午', pm: '下午', all: '全天' }[r.period] || '全天'}`, r.userName, r.questionText]) {
                     const cell = document.createElement('td');
                     cell.textContent = value || '';
                     row.appendChild(cell);

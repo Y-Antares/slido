@@ -97,7 +97,7 @@ function pageContext(file, fetch) {
     const elements = new Map();
     function element(id) {
         if (!elements.has(id)) elements.set(id, {
-            value: '', textContent: '', style: {}, disabled: false, listeners: {},
+            options: [{ text: '全天' }], selectedIndex: 0, value: '', textContent: '', style: {}, disabled: false, listeners: {},
             addEventListener(type, fn) { this.listeners[type] = fn; },
             querySelector() { return element('submit-button'); },
             getContext() { return { clearRect() {}, beginPath() {}, arc() {}, fill() {}, fillText() {}, closePath() {} }; },
@@ -109,7 +109,7 @@ function pageContext(file, fetch) {
     const storage = new Map();
     const context = vm.createContext({ document: { getElementById: element, createElement: () => element('escape') },
         window: { location: { pathname: '/session/am/ask', search: '?code=am&date=2026%2F10%2F24' }, innerWidth: 1280, innerHeight: 720 },
-        crypto: require('node:crypto').webcrypto, URLSearchParams, console, fetch, setTimeout, requestAnimationFrame() {},
+        crypto: require('node:crypto').webcrypto, URLSearchParams, console, fetch, setTimeout, clearTimeout, requestAnimationFrame() {},
         localStorage: { getItem: k => storage.get(k) || null, setItem: (k, v) => storage.set(k, v) } });
     const html = fs.readFileSync(path.join(__dirname, '../public', file), 'utf8');
     for (const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) vm.runInContext(match[1], context);
@@ -137,15 +137,74 @@ test('all lottery modes consume shared pool, respect date, and handle empty pool
             let url;
             const page = pageContext(file, async input => {
                 url = input;
-                return { ok: true, json: async () => ({ session: { name: '上午场' }, questions: empty ? [] : [
+                return { ok: true, json: async () => ({ session: { name: '同一话题' }, dates: ['2026/10/25', '2026/10/24'], questions: empty ? [] : [
                     { _id: '1', name: '甲', text: '问题', createdAt: '2026-10-24T01:00:00Z' },
                     { _id: '2', name: '乙', text: '问题', createdAt: '2026-10-25T01:00:00Z' }
                 ] }) };
             });
             await new Promise(setImmediate);
-            assert.equal(url, '/api/sessions/am/lottery-pool');
+            assert.equal(url, '/api/sessions/am/lottery-pool?period=all');
             assert.equal(vm.runInContext('filteredPool.length', page.context), empty ? 0 : 1, file);
             if (file !== 'lottery-flip.html') assert.equal(page.element('action-btn').disabled, empty);
         }
+    }
+});
+
+test('period filtering precedes participant grouping; noon and Shanghai midnight boundaries', () => {
+    const { context } = load();
+    context.rows = [
+        { _id: 'morning', participantId: 'a', name: '甲', text: '上午问题', createdAt: '2026-10-24T03:59:59.999Z' },
+        { _id: 'noon', participantId: 'a', name: '甲', text: '下午问题', createdAt: '2026-10-24T04:00:00.000Z' },
+        { _id: 'evening', participantId: 'b', name: '乙', text: '下午问题', createdAt: '2026-10-24T15:59:59.999Z' },
+        { _id: 'midnight', participantId: 'a', name: '甲', text: '次日凌晨', createdAt: '2026-10-24T16:00:00.000Z' }
+    ];
+    const morning = vm.runInContext("buildLotteryPool(rows, 'am')", context);
+    const afternoon = vm.runInContext("buildLotteryPool(rows, 'pm')", context);
+    const all = vm.runInContext("buildLotteryPool(rows, 'all')", context);
+    assert.deepEqual(Array.from(morning, q => q._id).sort(), ['midnight', 'morning']);
+    assert.deepEqual(Array.from(afternoon, q => q._id).sort(), ['evening', 'noon']);
+    assert.equal(all.length, 3); // day 1: a,b; day 2: a
+    assert.equal(all.find(q => q.questionCount === 2).name, '甲');
+    assert.equal(vm.runInContext("chinaPeriod('2026-10-24T04:00:00Z')", context), 'pm');
+    assert.equal(vm.runInContext("chinaPeriod('2026-10-24T16:00:00Z')", context), 'am');
+});
+test('pool API keeps dates with empty period, rejects invalid period, and retains legacy support', async () => {
+    const x = load();
+    x.models.Question.find = () => ({ select() { return this; }, sort() { return this; }, lean: async () => [
+        { _id: '1', name: '历史老师', text: '问题', createdAt: '2026-10-24T01:00:00Z' },
+        { _id: '2', name: '历史老师', text: '重复问题', createdAt: '2026-10-24T01:00:00Z' }
+    ] });
+    const handler = x.routes.get('GET /api/sessions/:code/lottery-pool');
+    const morning = response();
+    await handler({ params: { code: 'topic' }, query: { period: 'am' } }, morning);
+    assert.equal(morning.data.questions.length, 1);
+    const afternoon = response();
+    await handler({ params: { code: 'topic' }, query: { period: 'pm' } }, afternoon);
+    assert.equal(afternoon.data.questions.length, 0);
+    assert.deepEqual(Array.from(afternoon.data.dates), ['2026/10/24']);
+    const invalid = response();
+    await handler({ params: { code: 'topic' }, query: { period: 'invalid' } }, invalid);
+    assert.equal(invalid.code, 400);
+});
+test('every lottery mode clears stale pool while switching periods and ignores stale responses', async () => {
+    for (const file of ['lottery-flip.html', 'lottery-ball.html', 'lottery.html']) {
+        const pending = [];
+        const page = pageContext(file, url => new Promise(resolve => pending.push({ url, resolve })));
+        const reply = (i, id) => pending[i].resolve({ ok: true, json: async () => ({
+            session: { name: '同一话题' }, dates: ['2026/10/24'],
+            questions: [{ _id: id, name: id, text: id, createdAt: '2026-10-24T05:00:00Z' }]
+        }) });
+        reply(0, 'initial'); await new Promise(setImmediate);
+        assert.equal(vm.runInContext('filteredPool.length', page.context), 1);
+        page.element('period-selector').value = 'am';
+        const amLoad = page.element('period-selector').onchange();
+        assert.equal(vm.runInContext('filteredPool.length', page.context), 0);
+        page.element('period-selector').value = 'pm';
+        const pmLoad = page.element('period-selector').onchange();
+        assert.ok(pending[2].url.endsWith('period=pm'));
+        reply(2, 'afternoon'); await pmLoad;
+        reply(1, 'staleMorning'); await amLoad;
+        assert.equal(vm.runInContext('filteredPool[0]._id', page.context), 'afternoon', file);
+        assert.equal(page.element('date-selector').disabled, false);
     }
 });

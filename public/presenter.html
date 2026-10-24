@@ -329,7 +329,10 @@
             
             const qDate = new Date(questionData.createdAt || Date.now());
             const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(qDate).replace(/-/g, '/');
-            const groupId = 'group-' + dateStr.replace(/\//g, '-');
+            const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Shanghai', hour: '2-digit', hourCycle: 'h23' }).format(qDate));
+            const period = hour < 12 ? 'am' : 'pm';
+            const periodName = period === 'am' ? '上午' : '下午';
+            const groupId = 'group-' + dateStr.replace(/\//g, '-') + '-' + period;
 
             let groupContainer = document.getElementById(groupId);
             if (!groupContainer) {
@@ -339,7 +342,7 @@
 
                 const separator = document.createElement('div');
                 separator.className = 'date-separator';
-                separator.textContent = dateStr;
+                separator.textContent = `${dateStr} ${periodName}（北京时间）`;
 
                 const cardsContainer = document.createElement('div');
                 cardsContainer.className = 'date-cards';
@@ -384,9 +387,9 @@
 
             const lotteryBtn = document.createElement('button');
             lotteryBtn.className = 'lottery-link-btn';
-            lotteryBtn.textContent = '本场当日抽奖（每人一份资格）';
+            lotteryBtn.textContent = `本场${periodName}抽奖（每人一份资格）`;
             lotteryBtn.onclick = () => {
-                window.location.href = `/${modeSelect.value}?code=${sessionCode}&date=${dateStr}`;
+                window.location.href = `/${modeSelect.value}?code=${sessionCode}&date=${dateStr}&period=${period}`;
             };
 
             const delBtn = document.createElement('button');

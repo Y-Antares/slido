@@ -328,7 +328,7 @@
             const wall = document.getElementById('card-wall');
             
             const qDate = new Date(questionData.createdAt || Date.now());
-            const dateStr = qDate.toLocaleDateString('ja-JP');
+            const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(qDate).replace(/-/g, '/');
             const groupId = 'group-' + dateStr.replace(/\//g, '-');
 
             let groupContainer = document.getElementById(groupId);
@@ -384,7 +384,7 @@
 
             const lotteryBtn = document.createElement('button');
             lotteryBtn.className = 'lottery-link-btn';
-            lotteryBtn.textContent = '针对本场抽奖';
+            lotteryBtn.textContent = '本场当日抽奖（每人一份资格）';
             lotteryBtn.onclick = () => {
                 window.location.href = `/${modeSelect.value}?code=${sessionCode}&date=${dateStr}`;
             };

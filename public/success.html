@@ -71,7 +71,8 @@
         document.getElementById('back-btn').href = `/session/${sessionCode}/ask`;
 
         const storageKey = `submitted_questions_${sessionCode}`;
-        const submittedList = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        let submittedList = [];
+        try { const stored = JSON.parse(localStorage.getItem(storageKey) || '[]'); if (Array.isArray(stored)) submittedList = stored; } catch (_) {}
         
         const urlParams = new URLSearchParams(window.location.search);
         const isDuplicateAttempt = urlParams.get('dup') === '1';
@@ -90,12 +91,13 @@
 
         if (submittedList.length > 0) {
             historyContainer.style.display = 'block';
-            historyList.innerHTML = submittedList.map((item, index) => `
-                <div class="history-item">
-                    <span>${index + 1}. ${item.question}</span>
-                    <div style="font-size: 0.75rem; color: #9AA5B1; margin-top: 2px;">${new Date(item.time).toLocaleString('ja-JP', { hour12: false })}</div>
-                </div>
-            `).join('');
+            historyList.replaceChildren();
+            submittedList.forEach((item, index) => {
+                const entry = document.createElement('div');
+                entry.className = 'history-item';
+                entry.textContent = `${index + 1}. ${item.question}（${new Date(item.time).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}）`;
+                historyList.appendChild(entry);
+            });
         }
     </script>
 </body>

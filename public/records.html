@@ -51,7 +51,7 @@
             <thead>
                 <tr>
                     <th>抽奖时间</th>
-                    <th>场次代码</th>
+                    <th>教学场次 / 代码</th>
                     <th>问题日期</th>
                     <th>中奖人</th>
                     <th>提问内容</th>
@@ -66,15 +66,17 @@
             const resp = await fetch('/api/lottery-records');
             const data = await resp.json();
             const body = document.getElementById('record-body');
-            body.innerHTML = data.map(r => `
-                <tr>
-                    <td>${new Date(r.createdAt).toLocaleString('ja-JP')}</td>
-                    <td>${r.sessionCode}</td>
-                    <td>${r.date}</td>
-                    <td>${r.userName}</td>
-                    <td>${r.questionText}</td>
-                </tr>
-            `).join('');
+            body.replaceChildren();
+            for (const r of data) {
+                const row = document.createElement('tr');
+                for (const value of [new Date(r.createdAt).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+                    `${r.sessionName || '历史场次'} / ${r.sessionCode}`, r.date, r.userName, r.questionText]) {
+                    const cell = document.createElement('td');
+                    cell.textContent = value || '';
+                    row.appendChild(cell);
+                }
+                body.appendChild(row);
+            }
         }
         loadRecords();
     </script>

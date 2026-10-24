@@ -64,8 +64,8 @@
 </head>
 <body>
     <div class="header">
-        <h2 id="session-title">加载中...</h2>
-        日期：<select id="date-selector"></select>
+        <h2 id="session-title">加载中...</h2><p>当前场次内每人一份资格，提交多个问题不增加概率。</p>
+        日期（北京时间）：<select id="date-selector"></select>
     </div>
 
     <div class="floating-sidebar">
@@ -75,7 +75,7 @@
 
     <canvas id="ballCanvas"></canvas>
 
-    <div class="ui-layer"><button id="action-btn">开始碰撞</button></div>
+    <div class="ui-layer"><button id="action-btn" disabled>开始碰撞</button></div>
 
     <div id="result-modal">
         <h2 style="color: #4A90D9;">抽中啦！</h2>
@@ -96,52 +96,51 @@
         const targetDate = urlParams.get('date');
         let balls = [], allQuestions = [], filteredPool = [], isRunning = false, sessionName = "";
 
-        function calculateDifference(s1, s2) {
-            const len1 = s1.length, len2 = s2.length;
-            const matrix = Array.from({ length: len1 + 1 }, () => []);
-            for (let i = 0; i <= len1; i++) matrix[i][0] = i;
-            for (let j = 0; j <= len2; j++) matrix[0][j] = j;
-            for (let i = 1; i <= len1; i++) {
-                for (let j = 1; j <= len2; j++) {
-                    const cost = s1[i-1] === s2[j-1] ? 0 : 1;
-                    matrix[i][j] = Math.min(matrix[i-1][j]+1, matrix[i][j-1]+1, matrix[i-1][j-1]+cost);
-                }
-            }
-            return Math.max(len1, len2) === 0 ? 0 : matrix[len1][len2] / Math.max(len1, len2);
+        function chinaDate(value) {
+            return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai',
+                year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value)).replace(/-/g, '/');
+        }
+        function escapeHTML(value) {
+            const el = document.createElement('span');
+            el.textContent = String(value);
+            return el.innerHTML;
         }
 
         async function init() {
-            const resp = await fetch(`/api/sessions/${sessionCode}`);
+            const resp = await fetch(`/api/sessions/${sessionCode}/lottery-pool`);
             const data = await resp.json();
+            if (!resp.ok) throw new Error(data.message || "获取名单失败");
             allQuestions = data.questions;
             sessionName = data.session.name;
             document.getElementById('session-title').textContent = sessionName;
 
-            const dates = [...new Set(allQuestions.map(q => new Date(q.createdAt).toLocaleDateString('ja-JP')))].sort().reverse();
+            const dates = [...new Set(allQuestions.map(q => chinaDate(q.createdAt)))].sort().reverse();
             const selector = document.getElementById('date-selector');
+            if (!dates.length) document.getElementById('session-title').textContent = `${sessionName}（暂无有效参与者）`;
             selector.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
             if (targetDate && dates.includes(targetDate)) selector.value = targetDate;
 
             selector.onchange = () => {
-                const raw = allQuestions.filter(q => new Date(q.createdAt).toLocaleDateString('ja-JP') === selector.value);
+                const button = document.getElementById('action-btn');
+                if (button) { isRunning = false; button.textContent = '开始碰撞'; button.style.background = '#4A90D9'; }
+                const raw = allQuestions.filter(q => chinaDate(q.createdAt) === selector.value);
                 processPool(raw);
             };
             selector.onchange(); resize(); animate();
         }
 
         function processPool(raw) {
-            const grouped = {};
-            raw.forEach(q => {
-                if (!grouped[q.name]) grouped[q.name] = [];
-                if (!grouped[q.name].some(ext => calculateDifference(ext.text, q.text) <= 0.25)) {
-                    grouped[q.name].push(q);
-                }
-            });
-            filteredPool = Object.values(grouped).flat();
-            document.getElementById('sidebar-header').textContent = `有效抽奖 (${filteredPool.length})`;
-            document.getElementById('p-list').innerHTML = Object.entries(grouped)
-                .map(([name, qs]) => `<li>${name} (${qs.length})</li>`).join('');
+            filteredPool = raw.slice();
+            // 打乱卡片顺序，避免按提交时间排列泄露人选位置。
+            for (let i = filteredPool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [filteredPool[i], filteredPool[j]] = [filteredPool[j], filteredPool[i]];
+            }
+            document.getElementById('sidebar-header').textContent = `有效参与者 (${filteredPool.length})`;
+            document.getElementById('p-list').innerHTML = filteredPool
+                .map(q => `<li>${escapeHTML(q.name)}（1份资格）</li>`).join('');
             balls = filteredPool.map(q => new Ball(q));
+            document.getElementById('action-btn').disabled = filteredPool.length === 0;
         }
 
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -175,6 +174,7 @@
         function animate() { ctx.clearRect(0, 0, canvas.width, canvas.height); balls.forEach(b => b.update()); requestAnimationFrame(animate); }
 
         document.getElementById('action-btn').onclick = function() {
+            if (!balls.length) return;
             if (!isRunning) { isRunning = true; this.textContent = "停！"; this.style.background = "#EF4444"; }
             else { stopLottery(); }
         };
@@ -182,21 +182,30 @@
         async function stopLottery() {
             isRunning = false;
             document.getElementById('action-btn').style.background = '#4A90D9';
+            if (!balls.length) return;
+            document.getElementById('action-btn').textContent = '开始碰撞';
             const lucky = balls[Math.floor(Math.random() * balls.length)].q;
             confetti({ particleCount: 200, spread: 90, colors: ['#4A90D9', '#63A9E8', '#FFFFFF'] });
             document.getElementById('lucky-text').textContent = lucky.text;
             document.getElementById('lucky-name').textContent = `提问人：${lucky.name}`;
             document.getElementById('jump-btn').href = `/session/${sessionCode}#q-${lucky._id}`;
             document.getElementById('result-modal').style.display = 'block';
-            await fetch('/api/lottery-records', {
+            try {
+            const recordResponse = await fetch('/api/lottery-records', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     sessionName, sessionCode, date: document.getElementById('date-selector').value,
                     questionText: lucky.text, userName: lucky.name
                 })
             });
+            if (!recordResponse.ok) throw new Error('保存失败');
+            } catch (_) { alert('已抽出结果，但中奖记录保存失败，请手动记录。'); }
         }
-        init();
+        init().catch(error => {
+            document.getElementById('session-title').textContent = error.message;
+            const button = document.getElementById('action-btn');
+            if (button) button.disabled = true;
+        });
     </script>
 </body>
 </html>

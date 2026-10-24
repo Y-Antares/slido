@@ -1,5 +1,6 @@
 // --- 依赖引入 (Dependencies) ---
 const express = require('express');
+const { createHash, randomInt } = require('crypto');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
@@ -23,10 +24,6 @@ const upload = multer({ dest: os.tmpdir() });
 
 // --- 数据库连接 (Database Setup) ---
 const MONGO_URI = process.env.MONGO_URI; 
-mongoose.connect(MONGO_URI)
-    .then(() => console.log('成功连接到 MongoDB Atlas'))
-    .catch(err => console.error('连接 MongoDB 失败:', err));
-
 // --- 数据模型定义 (Data Models) ---
 
 // 1. 场次 (Session) 模型
@@ -43,10 +40,43 @@ const questionSchema = new mongoose.Schema({
     text: String,
     name: { type: String, default: '匿名' },
     sessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Session', required: true },
+    participantId: { type: String, select: false },
+    questionHash: { type: String, select: false },
     ipAddress: String, // 记录提问者 IP 地址
     createdAt: { type: Date, default: Date.now }
 });
+// 旧数据没有 participantId/questionHash，保留原样；新数据由数据库原子去重。
+questionSchema.set('autoIndex', false);
+questionSchema.index({ sessionId: 1, participantId: 1, questionHash: 1 }, {
+    name: 'unique_participant_question_v1', unique: true,
+    partialFilterExpression: { participantId: { $type: 'string' }, questionHash: { $type: 'string' } }
+});
 const Question = mongoose.model('Question', questionSchema);
+
+function normalizeQuestion(text) {
+    return text.replace(/\r\n?/g, '\n').trim();
+}
+function chinaDate(value) {
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date(value)).replace(/-/g, '/');
+}
+function buildLotteryPool(questions) {
+    const groups = new Map();
+    for (const q of questions) {
+        if (!q.text || !q.text.trim()) continue;
+        // 历史具名记录按姓名合并；历史匿名记录无法追溯身份，保守合并为一份资格。
+        const identity = q.participantId ? `id:${q.participantId}` : `legacy:${(q.name || '匿名').trim() || '匿名'}`;
+        const key = JSON.stringify([chinaDate(q.createdAt), identity]);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(q);
+    }
+    return [...groups.values()].map(items => {
+        const q = items[randomInt(items.length)];
+        return { _id: q._id, name: q.name || '匿名', text: q.text,
+            createdAt: q.createdAt, questionCount: items.length };
+    });
+}
 
 // 3. 中奖记录 (LotteryRecord) 模型
 const lotteryRecordSchema = new mongoose.Schema({
@@ -138,6 +168,18 @@ app.get('/api/sessions/:code', async (req, res) => {
     } catch (e) { res.status(500).json({ message: '获取信息失败' }); }
 });
 
+// 所有抽奖页面共享同一候选名单规则：每个参与者在所选日期仅一份资格。
+app.get('/api/sessions/:code/lottery-pool', async (req, res) => {
+    try {
+        const session = await Session.findOne({ code: req.params.code });
+        if (!session) return res.status(404).json({ message: '场次不存在' });
+        const questions = await Question.find({ sessionId: session._id })
+            .select('+participantId').sort({ createdAt: 1 }).lean();
+        res.set('Cache-Control', 'no-store');
+        res.json({ session, questions: buildLotteryPool(questions) });
+    } catch (e) { res.status(500).json({ message: '获取抽奖名单失败' }); }
+});
+
 // B. 语音转文字 API (新增)
 app.post('/api/voice-to-text', upload.single('audio'), (req, res) => {
     if (!req.file) return res.status(400).json({ message: '未找到音频文件' });
@@ -173,26 +215,33 @@ app.post('/api/voice-to-text', upload.single('audio'), (req, res) => {
 
 // C. 提问与删除 API
 app.post('/api/ask/:code', async (req, res) => {
-    const { question, name } = req.body;
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress; // 获取 IP
+    const { question, name, participantId } = req.body || {};
+    if (typeof question !== 'string' || !normalizeQuestion(question) || question.length > 10000 ||
+        (name !== undefined && (typeof name !== 'string' || name.length > 100)) ||
+        typeof participantId !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(participantId)) {
+        return res.status(400).json({ message: '请刷新页面后提交有效的问题（最多10000字，姓名最多100字）' });
+    }
+    const text = normalizeQuestion(question);
+    const ip = req.socket.remoteAddress;
     try {
         const session = await Session.findOne({ code: req.params.code });
         if (!session) return res.status(404).json({ message: '场次不存在' });
-
-        const newQuestion = new Question({ 
-            text: question, 
-            name: name || '匿名', 
-            sessionId: session._id,
-            ipAddress: ip 
-        });
+        const newQuestion = new Question({ text, name: (name || '').trim() || '匿名',
+            participantId: participantId.toLowerCase(),
+            questionHash: createHash('sha256').update(text).digest('hex'),
+            sessionId: session._id, ipAddress: ip });
         await newQuestion.save();
-
-        broadcastToRoom(session.code, {
-            type: 'new_question',
-            payload: newQuestion // 发送完整对象包含 ID 和时间
+        const payload = newQuestion.toObject();
+        delete payload.participantId;
+        delete payload.questionHash;
+        broadcastToRoom(session.code, { type: 'new_question', payload });
+        res.status(201).json({ message: '问题已收到' });
+    } catch (e) {
+        if (e.code === 11000) return res.status(409).json({
+            code: 'DUPLICATE_QUESTION', message: '你已在本场提交过这个问题，请勿重复提交。'
         });
-        res.status(200).json({ message: '问题已收到' });
-    } catch (e) { res.status(500).json({ message: '提交失败' }); }
+        res.status(500).json({ message: '提交失败，请稍后重试' });
+    }
 });
 
 app.delete('/api/questions/:id', async (req, res) => {
@@ -285,6 +334,15 @@ function broadcastToRoom(roomCode, data) {
 
 // --- 启动服务器 ---
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`服务器正在端口 ${PORT} 上运行`);
+// 连接和唯一索引准备完成后才接收请求，防止部署期间漏过查重。
+async function start() {
+    await mongoose.connect(MONGO_URI);
+    await Question.createIndexes();
+    server.listen(PORT, () => console.log(`服务器正在端口 ${PORT} 上运行`));
+}
+start().catch(error => {
+    console.error('启动失败：请检查数据库连接和索引创建权限', error);
+    process.exitCode = 1;
+    server.close();
+    mongoose.disconnect();
 });

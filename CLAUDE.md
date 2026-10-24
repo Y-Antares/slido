@@ -41,8 +41,8 @@ Each session code acts as a WebSocket room. When a client connects to `presenter
 | `presenter.html` (`/session/:code`) | public | Real-time question wall + QR code + online counter |
 | `client.html` (`/session/:code/ask`) | public | Mobile-friendly question submission form with voice input |
 | `success.html` (`/session/:code/success`) | public | Post-submission confirmation with "ask another" link |
-| `lottery-flip.html` | public | Flip-card lottery (Levenshtein dedup, grouped by author) |
-| `lottery-ball.html` | public | Bouncing-ball lottery (Levenshtein dedup, grouped by author) |
+| `lottery-flip.html` | public | Flip-card lottery (server participant pool; one entry per person/date) |
+| `lottery-ball.html` | public | Bouncing-ball lottery (server participant pool; one entry per person/date) |
 | `records.html` | public | Lottery winner history table |
 
 ### Voice Input Flow
@@ -63,3 +63,7 @@ Admin routes (`/`, `/admin`, `/api/sessions` POST/GET, `/api/questions` GET) are
 - `ADMIN_USERNAME` / `ADMIN_PASSWORD` — basic auth credentials for admin pages
 - `BAIDU_APP_ID` / `BAIDU_API_KEY` / `BAIDU_SECRET_KEY` — Baidu speech recognition credentials
 - `PORT` — server port (default: 3000)
+
+
+### Submission and lottery identity (2026-10)
+New questions store participantId (browser UUID) and questionHash (SHA-256 of trimmed, newline-normalized text), hidden from public question queries. A partial unique index on sessionId/participantId/questionHash prevents concurrent duplicate inserts; the server listens only after this index is ready. Legacy data remains untouched. `/api/sessions/:code/lottery-pool` groups by participantId and Shanghai calendar date; legacy rows fall back to name (all legacy anonymous rows collapse). It returns one random question per person/date without identity fields. All three lottery pages use this endpoint. Morning/afternoon use separate Session records and QR codes. This is browser identity, not authenticated personal identity; new sessions are recommended when upgrading mixed legacy data. Repeat wins across draws are permitted.

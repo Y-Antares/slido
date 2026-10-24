@@ -139,10 +139,10 @@
         <p class="subtitle">留下你的问题</p>
         <form id="question-form">
             <div class="input-group">
-                <input type="text" id="name-input" placeholder="你的名字（选填）">
+                <input type="text" maxlength="100" id="name-input" placeholder="你的名字（选填）">
             </div>
             <div class="textarea-container">
-                <textarea id="question-input" placeholder="在此输入你想探讨的内容..." required></textarea>
+                <textarea maxlength="10000" id="question-input" placeholder="在此输入你想探讨的内容..." required></textarea>
                 <button type="button" id="mic-btn" class="mic-btn">语音输入</button>
             </div>
             <button type="submit">立即提交</button>
@@ -222,41 +222,59 @@
             }
         });
 
+        let submitting = false;
+        const submitButton = form.querySelector('button[type="submit"]');
+        // 同一浏览器跨场次复用身份；不使用姓名或 IP 作为新记录的人员标识。
+        function getParticipantId() {
+            let id;
+            try { id = localStorage.getItem('poll_participant_id_v1'); } catch (_) {}
+            if (!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(id || '')) {
+                id = crypto.randomUUID();
+                localStorage.setItem('poll_participant_id_v1', id);
+            }
+            return id;
+        }
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (submitting) return;
             const question = questionInput.value.trim();
             const name = nameInput.value.trim();
             if (!question) return;
-
-            const storageKey = `submitted_questions_${sessionCode}`;
-            let submittedList = JSON.parse(localStorage.getItem(storageKey) || '[]');
-
-            // 检查是否存在完全相同的内容
-            const isDuplicate = submittedList.some(item => item.question === question);
-            if (isDuplicate) {
-                window.location.href = `/session/${sessionCode}/success?dup=1&text=${encodeURIComponent(question)}`;
-                return;
-            }
-
+            submitting = true;
+            submitButton.disabled = true;
+            submitButton.textContent = '提交中…';
+            messageEl.textContent = '';
             try {
+                let participantId;
+                try { participantId = getParticipantId(); }
+                catch (_) { throw new Error('请允许浏览器保存网站数据，并使用 HTTPS 打开页面后再提交。'); }
                 const response = await fetch(`/api/ask/${sessionCode}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ question, name })
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question, name, participantId })
                 });
-
-                if (response.ok) {
-                    submittedList.push({ question, name, time: new Date().toISOString() });
-                    localStorage.setItem(storageKey, JSON.stringify(submittedList));
-                    window.location.href = `/session/${sessionCode}/success?dup=0`;
-                } else {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || '提交失败');
+                const result = await response.json();
+                if (response.status === 409 && result.code === 'DUPLICATE_QUESTION') {
+                    messageEl.textContent = result.message;
+                    messageEl.style.color = '#EF4444';
+                    return;
                 }
+                if (!response.ok) throw new Error(result.message || '提交失败');
+                // 保存失败不能把服务器已成功接收的提交显示成失败。
+                try {
+                    const storageKey = `submitted_questions_${sessionCode}`;
+                    let list = JSON.parse(localStorage.getItem(storageKey) || '[]');
+                    if (!Array.isArray(list)) list = [];
+                    list.push({ question, name, time: new Date().toISOString() });
+                    localStorage.setItem(storageKey, JSON.stringify(list));
+                } catch (_) {}
+                window.location.href = `/session/${sessionCode}/success?dup=0`;
             } catch (error) {
                 messageEl.textContent = `❌ ${error.message}`;
                 messageEl.style.color = '#EF4444';
-                setTimeout(() => messageEl.textContent = '', 3000);
+            } finally {
+                submitting = false;
+                submitButton.disabled = false;
+                submitButton.textContent = '立即提交';
             }
         });
     </script>

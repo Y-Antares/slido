@@ -95,7 +95,7 @@
 
     <div class="overlay" id="overlay"></div>
     <div class="winner-modal" id="winner-modal">
-        <h2 style="color: #4A90D9;">恭喜中奖！</h2>
+        <h2 id="winner-title" style="color: #4A90D9;">恭喜中奖！</h2>
         <div id="winner-content" style="margin: 15px 0; font-size: 1.1rem; line-height:1.5;"></div>
         <div id="winner-name" style="color: #4A90D9; font-weight: bold;"></div>
         <div style="margin-top: 20px;">
@@ -210,6 +210,7 @@
             confetti({ particleCount: 100, spread: 70, colors: ['#4A90D9', '#63A9E8', '#FFFFFF'] });
 
             winnerTimer = setTimeout(() => {
+                document.getElementById('winner-title').textContent = `恭喜${lucky.name}同学！`;
                 document.getElementById('winner-content').textContent = lucky.text;
                 document.getElementById('winner-name').textContent = `— ${lucky.name}`;
                 document.getElementById('jump-btn').href = `/session/${sessionCode}#q-${lucky._id}`;

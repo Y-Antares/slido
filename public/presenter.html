@@ -387,7 +387,7 @@
 
             const lotteryBtn = document.createElement('button');
             lotteryBtn.className = 'lottery-link-btn';
-            lotteryBtn.textContent = `本场${periodName}抽奖（每人一份资格）`;
+            lotteryBtn.textContent = `本场${periodName}抽奖`;
             lotteryBtn.onclick = () => {
                 window.location.href = `/${modeSelect.value}?code=${sessionCode}&date=${dateStr}&period=${period}`;
             };

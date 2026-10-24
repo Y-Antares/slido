@@ -71,17 +71,20 @@ function buildLotteryPool(questions, period = 'all') {
     const groups = new Map();
     for (const q of questions) {
         if (!q.text || !q.text.trim()) continue;
+        // 匿名提问可以保留在展示墙，但不获得抽奖资格（包括历史记录）。
+        const nickname = typeof q.name === 'string' ? q.name.trim() : '';
+        if (!nickname || nickname === '匿名') continue;
         // 必须先按时段筛选，再按人合并，避免上午问题把下午参与资格挤掉。
         if (period !== 'all' && chinaPeriod(q.createdAt) !== period) continue;
-        // 历史具名记录按姓名合并；历史匿名记录无法追溯身份，保守合并为一份资格。
-        const identity = q.participantId ? `id:${q.participantId}` : `legacy:${(q.name || '匿名').trim() || '匿名'}`;
+        // 新记录按参与者 ID 合并；历史具名记录按姓名合并。
+        const identity = q.participantId ? `id:${q.participantId}` : `legacy:${nickname}`;
         const key = JSON.stringify([chinaDate(q.createdAt), identity]);
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key).push(q);
     }
     return [...groups.values()].map(items => {
         const q = items[randomInt(items.length)];
-        return { _id: q._id, name: q.name || '匿名', text: q.text,
+        return { _id: q._id, name: q.name.trim(), text: q.text,
             createdAt: q.createdAt, questionCount: items.length };
     });
 }

@@ -224,7 +224,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         sessionName, sessionCode, date: drawDate, period: drawPeriod,
-                        questionText: lucky.text, userName: lucky.name
+                        questionId: lucky._id, questionText: lucky.text, userName: lucky.name
                     })
                 });
                 if (!recordResponse.ok) throw new Error('保存失败');

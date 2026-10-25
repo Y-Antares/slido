@@ -222,6 +222,40 @@
             .card-wall { overflow-y: visible; }
             .card { width: 100%; }
         }
+
+        /* 中奖光圈独立于临时定位高亮，不会随定位动画结束而消失。 */
+        .card.lottery-winner { border-color: transparent; }
+        .card.lottery-winner::before,
+        .card.lottery-winner::after {
+            content: '';
+            position: absolute;
+            pointer-events: none;
+            inset: -4px;
+            padding: 4px;
+            border-radius: calc(var(--radius) + 4px);
+            background: linear-gradient(110deg, #ff3b6b, #ff9f1c, #ffe66d, #47e38c, #30cfff, #6574ff, #d958ff, #ff3b6b);
+            background-size: 400% 400%;
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+            animation: lotteryRainbowFlow 8s linear infinite;
+        }
+        .card.lottery-winner::after {
+            inset: -8px;
+            padding: 8px;
+            border-radius: calc(var(--radius) + 8px);
+            filter: blur(8px);
+            opacity: 0.65;
+        }
+        @keyframes lotteryRainbowFlow {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .card.lottery-winner::before,
+            .card.lottery-winner::after { animation: none; }
+        }
     </style>
 </head>
 <body>
@@ -304,6 +338,15 @@
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = `${wsProtocol}//${window.location.host}`;
         let ws;
+        const highlightedQuestionIds = new Set();
+        function applyLotteryHighlights(questionIds) {
+            for (const id of questionIds || []) {
+                if (typeof id !== 'string') continue;
+                highlightedQuestionIds.add(id);
+                const card = document.getElementById(`q-${id}`);
+                if (card) card.classList.add('lottery-winner');
+            }
+        }
         function connectWebSocket() {
             ws = new WebSocket(wsUrl);
             ws.onopen = () => ws.send(JSON.stringify({ type: 'join', room: sessionCode }));
@@ -314,6 +357,10 @@
                         createQuestionCard(data.payload);
                     } else if (data.type === 'client_count_update') {
                         document.getElementById('client-count').textContent = data.count;
+                    } else if (data.type === 'lottery_winner') {
+                        applyLotteryHighlights([data.payload.questionId]);
+                    } else if (data.type === 'lottery_highlights') {
+                        applyLotteryHighlights(data.payload.questionIds);
                     } else if (data.type === 'question_deleted') {
                         const card = document.querySelector(`.card[data-question-id="${data.payload.questionId}"]`);
                         if (card) { card.classList.add('deleting'); setTimeout(() => card.remove(), 300); }
@@ -325,6 +372,7 @@
 
         /* 替换后的卡片生成逻辑，加入日期分组检测与创建 */
         function createQuestionCard(questionData) {
+            if (document.getElementById(`q-${questionData._id}`)) return;
             const wall = document.getElementById('card-wall');
             
             const qDate = new Date(questionData.createdAt || Date.now());
@@ -357,6 +405,7 @@
             card.className = 'card';
             card.dataset.questionId = questionData._id;
             card.id = `q-${questionData._id}`;
+            if (highlightedQuestionIds.has(String(questionData._id))) card.classList.add('lottery-winner');
 
             const text = document.createElement('div');
             text.className = 'question-text';
@@ -416,6 +465,7 @@
                 const response = await fetch(`/api/sessions/${sessionCode}`);
                 const data = await response.json();
                 document.getElementById('session-title').textContent = data.session.name;
+                applyLotteryHighlights(data.highlightedQuestionIds);
                 data.questions.forEach(createQuestionCard);
 
                 if (window.location.hash) {

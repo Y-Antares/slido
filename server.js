@@ -71,12 +71,10 @@ function buildLotteryPool(questions, period = 'all') {
     const groups = new Map();
     for (const q of questions) {
         if (!q.text || !q.text.trim()) continue;
-        // 匿名提问可以保留在展示墙，但不获得抽奖资格（包括历史记录）。
-        const nickname = typeof q.name === 'string' ? q.name.trim() : '';
-        if (!nickname || nickname === '匿名') continue;
+        const nickname = (typeof q.name === 'string' ? q.name.trim() : '') || '匿名';
         // 必须先按时段筛选，再按人合并，避免上午问题把下午参与资格挤掉。
         if (period !== 'all' && chinaPeriod(q.createdAt) !== period) continue;
-        // 新记录按参与者 ID 合并；历史具名记录按姓名合并。
+        // 匿名和具名的新记录都按参与者 ID 合并；旧记录缺少身份时按姓名合并。
         const identity = q.participantId ? `id:${q.participantId}` : `legacy:${nickname}`;
         const key = JSON.stringify([chinaDate(q.createdAt), identity]);
         if (!groups.has(key)) groups.set(key, []);
@@ -84,7 +82,7 @@ function buildLotteryPool(questions, period = 'all') {
     }
     return [...groups.values()].map(items => {
         const q = items[randomInt(items.length)];
-        return { _id: q._id, name: q.name.trim(), text: q.text,
+        return { _id: q._id, name: (typeof q.name === 'string' ? q.name.trim() : '') || '匿名', text: q.text,
             createdAt: q.createdAt, questionCount: items.length };
     });
 }
@@ -95,11 +93,21 @@ const lotteryRecordSchema = new mongoose.Schema({
     sessionCode: String,
     date: String, // 抽奖针对的问题日期
     period: { type: String, enum: ['all', 'am', 'pm'], default: 'all' },
+    questionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Question' },
+    // 仅新抽奖接口核验过问题 ID 的记录启用展示墙标记；历史记录不回填。
+    highlightOnWall: { type: Boolean, default: false },
     questionText: String,
     userName: String,
     createdAt: { type: Date, default: Date.now }
 });
 const LotteryRecord = mongoose.model('LotteryRecord', lotteryRecordSchema);
+
+async function getLotteryHighlightIds(sessionCode) {
+    const records = await LotteryRecord.find({
+        sessionCode, highlightOnWall: true, questionId: { $exists: true }
+    }).select('questionId').lean();
+    return [...new Set(records.filter(record => record.questionId).map(record => String(record.questionId)))];
+}
 
 // --- Express 应用初始化 ---
 const app = express();
@@ -176,7 +184,9 @@ app.get('/api/sessions/:code', async (req, res) => {
         const session = await Session.findOne({ code: req.params.code });
         if (!session) return res.status(404).json({ message: '场次不存在' });
         const questions = await Question.find({ sessionId: session._id }).sort({ createdAt: 1 });
-        res.json({ session, questions });
+        const highlightedQuestionIds = await getLotteryHighlightIds(session.code);
+        res.set('Cache-Control', 'no-store');
+        res.json({ session, questions, highlightedQuestionIds });
     } catch (e) { res.status(500).json({ message: '获取信息失败' }); }
 });
 
@@ -286,8 +296,31 @@ app.get('/api/questions', adminAuth, async (req, res) => {
 // E. 中奖记录 API
 app.post('/api/lottery-records', async (req, res) => {
     try {
-        const record = new LotteryRecord(req.body);
+        // 保持旧客户端的记录接口兼容，但不把没有问题 ID 的记录反查成历史高亮。
+        const body = req.body || {};
+        const record = new LotteryRecord({ ...body, questionId: undefined, highlightOnWall: false });
+        if (body.questionId !== undefined) {
+            if (typeof body.questionId !== 'string' || !/^[a-f0-9]{24}$/i.test(body.questionId)) {
+                return res.status(400).json({ message: '保存记录失败' });
+            }
+            const session = await Session.findOne({ code: body.sessionCode });
+            if (!session) return res.status(404).json({ message: '场次不存在' });
+            const question = await Question.findOne({ _id: body.questionId, sessionId: session._id });
+            if (!question) return res.status(400).json({ message: '保存记录失败' });
+            record.questionId = question._id;
+            record.highlightOnWall = true;
+            record.sessionCode = session.code;
+            record.sessionName = session.name;
+            record.questionText = question.text;
+            record.userName = question.name || '匿名';
+        }
+        // 先持久化，再通知展示墙；刷新后从相同记录恢复，不使用浏览器临时缓存。
         await record.save();
+        if (record.highlightOnWall) {
+            broadcastToRoom(record.sessionCode, {
+                type: 'lottery_winner', payload: { questionId: String(record.questionId) }
+            });
+        }
         res.status(201).json(record);
     } catch (e) { res.status(500).json({ message: '保存记录失败' }); }
 });
@@ -318,6 +351,11 @@ wss.on('connection', (ws) => {
                 // 更新历史总连接数并广播当前在线人数
                 await Session.findOneAndUpdate({ code: roomCode }, { $inc: { totalConnections: 1 } });
                 broadcastCount(roomCode);
+                // 重连补齐断线期间的中奖标记；先加入房间，避免查询期间漏掉实时消息。
+                const questionIds = await getLotteryHighlightIds(roomCode);
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: 'lottery_highlights', payload: { questionIds } }));
+                }
             }
         } catch (e) { console.error("WS 消息解析失败", e); }
     });
